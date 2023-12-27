@@ -1,7 +1,7 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)
 project(2k1000)
 
-set(target2k OFF)
+set(target2k ON)
 
 
 if(target2k)

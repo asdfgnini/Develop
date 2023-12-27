@@ -60,7 +60,6 @@ long oid_hexToDec(char* source);
 
 void cb_oid_test_singal();
 
-
 /****************************位置*********************************************/
 /****************************ATGM336H****************************************/
 #define GPS_Buffer_Length 1024
@@ -124,14 +123,72 @@ static int gps_uart_cfg(const uart_cfg_t *cfg);
 
 void cb_gps_test_singal();
 
+/****************************WTGPS****************************************/
+#define WTGPS_GPS_Buffer_Length 1024
+#define WTGPS_GPS_Buffer_Length_4 (GPS_Buffer_Length-524)
+#define WTGPS_GPS_Buffer_Length_2 120
+#define WTGPS_GPS_Buffer_Length_3 100
+#define WTGPS_UTCTime_Length 11
+#define WTGPS_latitude_Length 11
+#define WTGPS_N_S_Length 2
+#define WTGPS_longitude_Length 12
+#define WTGPS_E_W_Length 2
 
+typedef struct WTGPS_GPS_SaveData
+{
+    char GPS_Buffer[GPS_Buffer_Length];
+    char Data[GPS_Buffer_Length_2];
+    char GNRMC[GPS_Buffer_Length_3];
+    char GNGGA[GPS_Buffer_Length_3];
+    char GNVTG[GPS_Buffer_Length_3];
+
+    char isGetData;		//是否获取到GPS数据
+    char isParseData;	//是否解析完成
+    char UTCTime[UTCTime_Length];		//UTC时间
+    char latitude[latitude_Length];		//纬度
+    char N_S[N_S_Length];		//N/S
+    char longitude[longitude_Length];		//经度
+    char E_W[E_W_Length];		//E/W
+    char isUsefull;		//定位信息是否有效
+    double raw_altitude; //海拔
+    double raw_satellites;//卫星数量
+    double raw_hdop;//精度因子
+   double raw_speed;      //水平速率
+   double raw_course;     //地面航向
+
+    int m_read_idx;
+} WTGPS_GPS_SaveData;
+WTGPS_GPS_SaveData WTGPS_GPS_Save_Data;
+
+typedef struct WTGPS_gps_zheng_data
+{
+    int pos;//获取目标帧的起始位置
+    char* start;
+    char* end;
+    bool Give_up ;//判断是否放弃这帧数据
+    bool find ;//判断是否找到这帧数据
+}WTGPS_Gps_Zheng_data;
+WTGPS_Gps_Zheng_data WTGPS_GNRMC;
+WTGPS_Gps_Zheng_data WTGPS_GNGGA;
+WTGPS_Gps_Zheng_data WTGPS_GNVTG;
+static struct termios WTGPS_gps_old_cfg;  //用于保存终端的配置参数
+
+double WTGPS_Convert_to_degrees(char* data);// GPS数据转化单位为度。
+void WTGPS_printGpsBuffer();//打印GPS解码后相关数据
+void WTGPS_printf_GNVTG();
+void WTGPS_printf_GNGGA();
+void WTGPS_GNRMC_calc_shuju();
+void WTGPS_GNGGA_calc_shuju();
+void WTGPS_GNVTG_calc_shuju();
+static int WTGPS_gps_uart_init(const char *device);
+static int WTGPS_gps_uart_cfg(const uart_cfg_t *cfg);
+
+void cb_wtgps_test_singal();
 
 /****************************姿态*********************************************/
 /**************************WIT*****************************************/
 
 static struct termios wit_old_cfg;  //用于保存终端的配置参数
-//funtion api
-
 #define WIT_Buffer_Length 250
 typedef struct WIT_SaveData
 {
@@ -162,7 +219,38 @@ typedef struct WIT_SaveData
 static int wit_uart_init(const char *device);
 static int wit_uart_cfg(const uart_cfg_t *cfg);
 void cb_wit_test_singal();
-
+/**************************JY9*****************************************/
+static struct termios JY9_old_cfg;  //用于保存终端的配置参数
+#define JY9_Buffer_Length 250
+typedef struct JY9_SaveData
+{
+    char JY9_Buffer[JY9_Buffer_Length];
+    struct
+    {
+        uint32_t x;
+        uint32_t y;
+       uint32_t z;
+    }raw;
+    float x;//x 角速度
+    float y;//y 角速度
+    float z;//z 角速度
+    float a_x;//x 角加速度
+    float a_y;//y 角加速度
+    float a_z;//z 角加速度
+    float roll;                     
+    float pitch;
+    float yaw;
+    int isGet;
+    int pos = 0;
+    int a_isGet;
+    int a_pos = 0;
+    int j_isGet;
+    int j_pos = 0;
+}  JY9_SaveData;
+ JY9_SaveData  JY9_Save_Data;
+static int jy9_uart_init(const char *device);
+static int jy9_uart_cfg(const uart_cfg_t *cfg);
+void cb_jy9_test_singal();
 
 /****************************全局*********************************************/
 void observeALLDeviceHotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
@@ -172,8 +260,12 @@ void observe_BRT_HotPlugEventCallback(const DevType devType,const DevAction devA
 void observe_OID_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
 /****************************WIT*********************************************/
 void observe_WIT_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
+/****************************JY9*********************************************/
+void observe_JY9_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
 /****************************ATGM336H*********************************************/
 void observe_ATGM336H_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
+/****************************WTGPS*********************************************/
+void observe_WTGPS_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
 
 //尾插
 int arry_insert_back(const char* devpath);
@@ -209,10 +301,16 @@ int main(int argc , char * argv[])
     {
         if(strcmp(argv[1],"-h") == 0)
         {
+            printf("*****************速度******************\r\n");
             printf("-brt        支持_速度_传感器brt热插拔\r\n");
-            printf("-oid        支持_速度_传感器oid热插拔\r\n");
+            printf("-oid        支持_速度_传感器oid热插拔\r\n\r\n");
+            printf("*****************姿态******************\r\n");
             printf("-wit        支持_姿态_传感器wit热插拔\r\n");
-            printf("-atgm336h   支持_位置_传感器atgm336h热插拔\r\n");
+            printf("-jy9        支持_姿态_传感器JY901B热插拔\r\n\r\n");
+            printf("*****************位置******************\r\n");
+            printf("-atgm       支持_位置_传感器atgm336h热插拔\r\n");
+            printf("-wtgps      支持_位置_传感器WTGPS+BD热插拔\r\n\r\n");
+            printf("***************************************\r\n");
             printf("-all        支持插入多个传感器(按一定顺序)\r\n");
 
             exit(-1);
@@ -314,7 +412,23 @@ int main(int argc , char * argv[])
             pause();
             exit(-1);
         }
-        else if(strcmp(argv[1],"-atgm336h") == 0)
+        else if(strcmp(argv[1],"-jy9") == 0)
+        {
+            //注册设备回调表
+            dev_map.insert(std::pair<const char*,function_type>("/dev/ttyUSB0",cb_jy9_test_singal));
+            //注册设备号相对位置表
+            pos_map.insert(std::pair<const char*,int>("/dev/ttyUSB0",0));
+            //初始化热插拔服务器
+            initHotPlugObserver();
+            //注册热插拔事件回调
+            registerObserveCallback(ObserveDeviceType_All,observe_JY9_HotPlugEventCallback);
+            printf("系统初始化完毕\r\n");
+
+            //阻塞主线程
+            pause();
+            exit(-1);
+        }
+        else if(strcmp(argv[1],"-atgm") == 0)
         {
             //注册设备回调表
             dev_map.insert(std::pair<const char*,function_type>("/dev/ttyUSB0",cb_gps_test_singal));
@@ -324,6 +438,22 @@ int main(int argc , char * argv[])
             initHotPlugObserver();
             //注册热插拔事件回调
             registerObserveCallback(ObserveDeviceType_All,observe_ATGM336H_HotPlugEventCallback);
+            printf("系统初始化完毕\r\n");
+
+            //阻塞主线程
+            pause();
+            exit(-1);
+        }
+        else if(strcmp(argv[1],"-wtgps") == 0)
+        {
+            //注册设备回调表
+            dev_map.insert(std::pair<const char*,function_type>("/dev/ttyUSB0",cb_wtgps_test_singal));
+            //注册设备号相对位置表
+            pos_map.insert(std::pair<const char*,int>("/dev/ttyUSB0",0));
+            //初始化热插拔服务器
+            initHotPlugObserver();
+            //注册热插拔事件回调
+            registerObserveCallback(ObserveDeviceType_All,observe_WTGPS_HotPlugEventCallback);
             printf("系统初始化完毕\r\n");
 
             //阻塞主线程
@@ -632,6 +762,63 @@ void observe_WIT_HotPlugEventCallback(const DevType devType,const DevAction devA
         }
     }
 }
+/*********************************JY9************************************************/
+void observe_JY9_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
+{
+    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+    {
+        int pos = arry_insert_back(devPath);
+        if(pos != -1)
+        {
+            if(devType == DevType_Tty)
+            {
+                if(devAction == DevAction_Add)
+                {
+                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+                    {
+                        auto iter = pos_map.find("/dev/ttyUSB0");
+                        if(iter != pos_map.end())
+                        {
+                            isstop[iter->second] = false; 
+                            auto iter2 = dev_map.find("/dev/ttyUSB0");
+                            if(iter2 != dev_map.end())
+                            {
+                                std::thread brt(iter2->second);
+                                brt.detach();
+                                printf("姿态传感器JY901B插入\r\n");
+                            }
+                            else
+                            {
+                                printf("[ADD]: JY9 dev_map没找到 %d\r\n",__LINE__);
+                            }
+                        }
+                        else
+                        {
+                            printf("[ADD]:JY9 pos_map没找到 %d\r\n",__LINE__);
+                        }
+                    }  
+                }
+                else if(devAction == DevAction_Remove)
+                {
+                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+                    {
+                        auto iter = pos_map.find("/dev/ttyUSB0");
+                        if(iter != pos_map.end())
+                        {
+                            stop_Thread(iter->second,true);  
+                            array_delete_pre(devPath);
+                            printf("姿态传感器 JY901B拔出\r\n");
+                        }
+                        else
+                        {
+                            printf("[REMOVE]:pos_map没找到 %d\r\n",__LINE__);   
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 /*********************************ATGM336H************************************************/
 void observe_ATGM336H_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
 {
@@ -678,6 +865,63 @@ void observe_ATGM336H_HotPlugEventCallback(const DevType devType,const DevAction
                             stop_Thread(iter->second,true);  
                             array_delete_pre(devPath);
                             printf("位置传感器ATGM336h拔出\r\n");
+                        }
+                        else
+                        {
+                            printf("[REMOVE]:pos_map没找到 %d\r\n",__LINE__);   
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+/*********************************WTGPS+BD************************************************/
+void observe_WTGPS_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
+{
+    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+    {
+        int pos = arry_insert_back(devPath);
+        if(pos != -1)
+        {
+            if(devType == DevType_Tty)
+            {
+                if(devAction == DevAction_Add)
+                {
+                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+                    {
+                        auto iter = pos_map.find("/dev/ttyUSB0");
+                        if(iter != pos_map.end())
+                        {
+                            isstop[iter->second] = false; 
+                            auto iter2 = dev_map.find("/dev/ttyUSB0");
+                            if(iter2 != dev_map.end())
+                            {
+                                std::thread brt(iter2->second);
+                                brt.detach();
+                                printf("位置传感器WTGPS插入\r\n");
+                            }
+                            else
+                            {
+                                printf("[ADD]: WTGPS dev_map没找到 %d\r\n",__LINE__);
+                            }
+                        }
+                        else
+                        {
+                            printf("[ADD]:WTGPS pos_map没找到 %d\r\n",__LINE__);
+                        }
+                    }  
+                }
+                else if(devAction == DevAction_Remove)
+                {
+                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+                    {
+                        auto iter = pos_map.find("/dev/ttyUSB0");
+                        if(iter != pos_map.end())
+                        {
+                            stop_Thread(iter->second,true);  
+                            array_delete_pre(devPath);
+                            printf("位置传感器WTGPS拔出\r\n");
                         }
                         else
                         {
@@ -1527,6 +1771,347 @@ static int wit_uart_cfg(const uart_cfg_t *cfg)
     /* 配置OK 退出 */
     return 0;
 }
+/***********************************JY9**************************************************/
+void cb_jy9_test_singal()
+{
+    uart_cfg_t cfg = {0};
+    //串口初始
+    jy9_uart_init("/dev/ttyUSB0");
+    //设置串口参数 9600 8 1 无校验
+    jy9_uart_cfg(&cfg);
+    int ret = 0;
+    int pos = -1;
+     /*第一步，串口初始化*/
+    for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
+    {
+        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        {
+            pos = it->second;
+            break;
+        }
+        else
+        {
+            printf("cb_jy9_test pos_map没找到 %d\r\n",__LINE__);
+        }
+    }
+    while(Get_isstop(pos) != true)
+    { 
+        ret = read(fd[pos], JY9_Save_Data.JY9_Buffer, sizeof(JY9_Save_Data.JY9_Buffer)-1);
+        JY9_Save_Data.JY9_Buffer[ret] = 0;
+        if (ret < 0)
+        {
+            printf("read failed\n");
+        }
+        else if (ret > 0)
+        {
+            
+           //原始数据
+#ifdef __Debug_info
+           for (int i = 0; i < WIT_Buffer_Length; i++)
+           {
+                printf("0x%x ", JY9_Save_Data.JY9_Buffer[i]);              
+           } 
+           printf("\r\n");         
+#endif
+            //查找关键数据位置
+
+            int i = 0;
+            for (i = 0; i < 200; i++)
+            {
+                //寻找角速度
+                if(JY9_Save_Data.JY9_Buffer[i] == 0x55 && JY9_Save_Data.JY9_Buffer[i + 1] == 0x52)
+                {
+                JY9_Save_Data.isGet = 1;       
+#ifdef __Debug_info
+                printf("获取到角速度关键数据帧\r\n");  
+                printf("0x%x 0x%x 0x%x 0x%x 0x%x 0x%x \r\n",JY9_Save_Data.JY9_Buffer[i + 2],JY9_Save_Data.JY9_Buffer[i + 3],JY9_Save_Data.JY9_Buffer[i + 4],JY9_Save_Data.JY9_Buffer[i + 5],JY9_Save_Data.JY9_Buffer[i + 6],JY9_Save_Data.JY9_Buffer[i + 7]);
+#endif               
+               JY9_Save_Data.pos = i + 2; 
+                        break;
+                }
+            }
+
+            for (i = 0; i < 200; i++)
+            {
+                //寻找角加速度
+                if(JY9_Save_Data.JY9_Buffer[i] == 0x55 && JY9_Save_Data.JY9_Buffer[i + 1] == 0x51)
+                {
+                JY9_Save_Data.a_isGet = 1;       
+#ifdef __Debug_info
+                printf("获取到角加速度关键数据帧\r\n");  
+                printf("0x%x 0x%x 0x%x 0x%x 0x%x 0x%x \r\n",JY9_Save_Data.JY9_Buffer[i + 2],JY9_Save_Data.JY9_Buffer[i + 3],JY9_Save_Data.JY9_Buffer[i + 4],JY9_Save_Data.JY9_Buffer[i + 5],JY9_Save_Data.JY9_Buffer[i + 6],JY9_Save_Data.JY9_Buffer[i + 7]);
+#endif        
+                JY9_Save_Data.a_pos = i + 2;       
+                break; 
+                }
+            }
+
+            for (i = 0; i < 200; i++)
+            {
+                //寻找角度
+                if(JY9_Save_Data.JY9_Buffer[i] == 0x55 && JY9_Save_Data.JY9_Buffer[i + 1] == 0x53)
+                {
+                JY9_Save_Data.j_isGet = 1;       
+#ifdef __Debug_info
+                printf("获取到角度关键数据帧\r\n");  
+                printf("0x%x 0x%x 0x%x 0x%x 0x%x 0x%x \r\n",JY9_Save_Data.JY9_Buffer[i + 2],JY9_Save_Data.JY9_Buffer[i + 3],JY9_Save_Data.JY9_Buffer[i + 4],JY9_Save_Data.JY9_Buffer[i + 5],JY9_Save_Data.JY9_Buffer[i + 6],JY9_Save_Data.JY9_Buffer[i + 7]);
+#endif               
+                JY9_Save_Data.j_pos = i + 2;     
+                break;       
+                }
+            }
+            system("clear");
+            //解析角速度
+            if(JY9_Save_Data.isGet)
+            {
+                JY9_Save_Data.isGet = 0;  
+                //计算角速度
+                JY9_Save_Data.raw.x =  (uint32_t)(JY9_Save_Data.JY9_Buffer[JY9_Save_Data.pos+1] << 8)|JY9_Save_Data.JY9_Buffer[JY9_Save_Data.pos];
+                JY9_Save_Data.pos = JY9_Save_Data.pos + 2;
+                JY9_Save_Data.raw.y =  (uint32_t)(JY9_Save_Data.JY9_Buffer[JY9_Save_Data.pos+1] << 8)|JY9_Save_Data.JY9_Buffer[JY9_Save_Data.pos];        
+                JY9_Save_Data.pos = JY9_Save_Data.pos + 2;
+                JY9_Save_Data.raw.z =  (uint32_t)(JY9_Save_Data.JY9_Buffer[JY9_Save_Data.pos+1] << 8)|JY9_Save_Data.JY9_Buffer[JY9_Save_Data.pos];
+                
+                JY9_Save_Data.x = (float)JY9_Save_Data.raw.x / 32768 *2000;
+                JY9_Save_Data.y = (float)JY9_Save_Data.raw.y / 32768 *2000;
+                JY9_Save_Data.z = (float)JY9_Save_Data.raw.z / 32768 *2000;
+
+
+
+                 
+                // printf("Gx: %.02f Gy: %.02f Gz: %.02f\r\n",JY9_Save_Data.x,JY9_Save_Data.y,JY9_Save_Data.z);    
+             
+            }
+
+            //解析角加速度
+            if(JY9_Save_Data.a_isGet)
+            {
+                JY9_Save_Data.a_isGet = 0;  
+                //计算角加速度
+
+                JY9_Save_Data.raw.x =  (uint32_t)(JY9_Save_Data.JY9_Buffer[JY9_Save_Data.a_pos+1] << 8)|JY9_Save_Data.JY9_Buffer[JY9_Save_Data.a_pos];
+                JY9_Save_Data.a_pos = JY9_Save_Data.a_pos + 2;
+                JY9_Save_Data.raw.y =  (uint32_t)(JY9_Save_Data.JY9_Buffer[JY9_Save_Data.a_pos+1] << 8)|JY9_Save_Data.JY9_Buffer[JY9_Save_Data.a_pos];        
+                JY9_Save_Data.a_pos = JY9_Save_Data.a_pos + 2;
+                JY9_Save_Data.raw.z =  (uint32_t)(JY9_Save_Data.JY9_Buffer[JY9_Save_Data.a_pos+1] << 8)|JY9_Save_Data.JY9_Buffer[JY9_Save_Data.a_pos];
+                
+
+                JY9_Save_Data.a_x = (float)JY9_Save_Data.raw.x / 32768 *16*9.8f;
+                JY9_Save_Data.a_y = (float)JY9_Save_Data.raw.y / 32768 *16*9.8f;
+                JY9_Save_Data.a_z = (float)JY9_Save_Data.raw.z / 32768 *16*9.8f;
+
+
+
+            
+                // printf("ax: %.02f ay: %.02f az: %.02f\r\n",JY9_Save_Data.a_x,JY9_Save_Data.a_y,JY9_Save_Data.a_z);    
+             
+            }
+    
+            //解析角度
+            if(JY9_Save_Data.j_isGet)
+            {
+                JY9_Save_Data.j_isGet = 0;  
+                //计算角度
+
+                JY9_Save_Data.raw.x =  (uint32_t)(JY9_Save_Data.JY9_Buffer[JY9_Save_Data.j_pos+1] << 8)|JY9_Save_Data.JY9_Buffer[JY9_Save_Data.j_pos];
+                JY9_Save_Data.j_pos = JY9_Save_Data.j_pos + 2;
+                JY9_Save_Data.raw.y =  (uint32_t)(JY9_Save_Data.JY9_Buffer[JY9_Save_Data.j_pos+1] << 8)|JY9_Save_Data.JY9_Buffer[JY9_Save_Data.j_pos];        
+                JY9_Save_Data.j_pos = JY9_Save_Data.j_pos + 2;
+                JY9_Save_Data.raw.z =  (uint32_t)(JY9_Save_Data.JY9_Buffer[JY9_Save_Data.j_pos+1] << 8)|JY9_Save_Data.JY9_Buffer[JY9_Save_Data.j_pos];
+                
+                JY9_Save_Data.roll = (float)JY9_Save_Data.raw.x / 32768 *180.0f;
+                JY9_Save_Data.pitch = (float)JY9_Save_Data.raw.y / 32768 *180.0f;
+                JY9_Save_Data.yaw = (float)JY9_Save_Data.raw.z / 32768 *180.0f;
+
+                printf("Gx: %.02f  Gy: %.02f  Gz: %.02f  ax: %.02f  ay: %.02f  az: %.02f  roll: %.02f  pitch: %.02f  yaw: %.02f\r\n",\
+                JY9_Save_Data.x,JY9_Save_Data.y,JY9_Save_Data.z,JY9_Save_Data.a_x,JY9_Save_Data.a_y,JY9_Save_Data.a_z,JY9_Save_Data.roll,JY9_Save_Data.pitch,JY9_Save_Data.yaw);    
+             
+            }
+        }
+        usleep(100000);
+    }
+    /* 退出 */
+    tcsetattr(fd[pos], TCSANOW, &wit_old_cfg);   //恢复到之前的配置
+    close(fd[pos]);
+}
+//串口初始化
+static int jy9_uart_init(const char *device)
+{
+    int pos = -1;
+     /*第一步，串口初始化*/
+    for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
+    {
+        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        {
+            pos = it->second;
+            break;
+        }
+        else
+        {
+            printf("cb_jy9_test pos_map没找到 %d\r\n",__LINE__);
+        }
+    }
+
+
+    /* 打开串口终端  使用的标志有 可读可写，告诉系统该节点不会成为进程的控制终端，非阻塞方式，读不到数据返回-1,*/
+    fd[pos] = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    if (0 > fd) {
+        fprintf(stderr, "open error: %s: %s\n", device, strerror(errno));
+        return -1;
+    }
+
+    /* 获取串口当前的配置参数 */
+    if (0 > tcgetattr(fd[pos], &JY9_old_cfg)) 
+    {
+        fprintf(stderr, "tcgetattr error: %s\n", strerror(errno));
+        close(fd[pos]);
+        return -1;
+    }
+
+    return 0;
+}
+//串口配置
+static int jy9_uart_cfg(const uart_cfg_t *cfg)
+{
+
+    int pos = -1;
+     /*第一步，串口初始化*/
+    for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
+    {
+        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        {
+            pos = it->second;
+            break;
+        }
+        else
+        {
+            printf("cb_jy9_test pos_map没找到 %d\r\n",__LINE__);
+        }
+    }
+
+    struct termios new_cfg = {0};   //将new_cfg对象清零
+    speed_t speed;
+
+    /* 设置为原始模式 */
+    cfmakeraw(&new_cfg);
+
+    /* 使能接收 */
+    new_cfg.c_cflag |= CREAD;
+
+    /* 设置波特率 */
+    switch (cfg->baudrate) {
+        case 1200: speed = B1200;
+            break;
+        case 1800: speed = B1800;
+            break;
+        case 2400: speed = B2400;
+            break;
+        case 4800: speed = B4800;
+            break;
+        case 9600: speed = B9600;
+            break;
+        case 19200: speed = B19200;
+            break;
+        case 38400: speed = B38400;
+            break;
+        case 57600: speed = B57600;
+            break;
+        case 115200: speed = B115200;
+            break;
+        case 230400: speed = B230400;
+            break;
+        case 460800: speed = B460800;
+            break;
+        case 500000: speed = B500000;
+            break;
+        default:    //默认配置为115200
+            speed = B9600;
+            // printf("default baud rate: 9600\n");
+            break;
+    }
+
+    if (0 > cfsetspeed(&new_cfg, speed)) 
+    {
+        fprintf(stderr, "cfsetspeed error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    /* 设置数据位大小 */
+    new_cfg.c_cflag &= ~CSIZE;  //将数据位相关的比特位清零
+    switch (cfg->dbit) {
+        case 5:
+            new_cfg.c_cflag |= CS5;
+            break;
+        case 6:
+            new_cfg.c_cflag |= CS6;
+            break;
+        case 7:
+            new_cfg.c_cflag |= CS7;
+            break;
+        case 8:
+            new_cfg.c_cflag |= CS8;
+            break;
+        default:    //默认数据位大小为8
+            new_cfg.c_cflag |= CS8;
+            // printf("default data bit size: 8\n");
+            break;
+    }
+
+    /* 设置奇偶校验 */
+    switch (cfg->parity) {
+        case 'N':       //无校验
+            new_cfg.c_cflag &= ~PARENB;
+            new_cfg.c_iflag &= ~INPCK;
+            break;
+        case 'O':       //奇校验
+            new_cfg.c_cflag |= (PARODD | PARENB);
+            new_cfg.c_iflag |= INPCK;
+            break;
+        case 'E':       //偶校验
+            new_cfg.c_cflag |= PARENB;
+            new_cfg.c_cflag &= ~PARODD; /* 清除PARODD标志，配置为偶校验 */
+            new_cfg.c_iflag |= INPCK;
+            break;
+        default:    //默认配置为无校验
+            new_cfg.c_cflag &= ~PARENB;
+            new_cfg.c_iflag &= ~INPCK;
+            // printf("default parity: N\n");
+            break;
+    }
+
+    /* 设置停止位 */
+    switch (cfg->sbit) {
+        case 1:     //1个停止位
+            new_cfg.c_cflag &= ~CSTOPB;
+            break;
+        case 2:     //2个停止位
+            new_cfg.c_cflag |= CSTOPB;
+            break;
+        default:    //默认配置为1个停止位
+            new_cfg.c_cflag &= ~CSTOPB;
+            // printf("default stop bit size: 1\n");
+            break;
+    }
+
+    /* 将MIN和TIME设置为0 */
+    new_cfg.c_cc[VTIME] = 0;
+    new_cfg.c_cc[VMIN] = 0;
+
+    /* 清空缓冲区 */
+    if (0 > tcflush(fd[pos], TCIOFLUSH)) {
+        fprintf(stderr, "tcflush error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    /* 写入配置、使配置生效 */
+    if (0 > tcsetattr(fd[pos], TCSANOW, &new_cfg)) {
+        fprintf(stderr, "tcsetattr error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    /* 配置OK 退出 */
+    return 0;
+}
 /***********************************位置**************************************************/
 /***********************************ATGM336H*********************************************/
 void cb_gps_test_singal()
@@ -2045,6 +2630,662 @@ static int gps_uart_init(const char *device)
 }
 //串口配置
 static int gps_uart_cfg(const uart_cfg_t *cfg)
+{
+
+    int pos = -1;
+     /*第一步，串口初始化*/
+    for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
+    {
+        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        {
+            pos = it->second;
+            break;
+        }
+        else
+        {
+            printf("cb_brt_test pos_map没找到 %d\r\n",__LINE__);
+        }
+    }
+
+    struct termios new_cfg = {0};   //将new_cfg对象清零
+    speed_t speed;
+
+    /* 设置为原始模式 */
+    cfmakeraw(&new_cfg);
+
+    /* 使能接收 */
+    new_cfg.c_cflag |= CREAD;
+
+    /* 设置波特率 */
+    switch (cfg->baudrate) {
+        case 1200: speed = B1200;
+            break;
+        case 1800: speed = B1800;
+            break;
+        case 2400: speed = B2400;
+            break;
+        case 4800: speed = B4800;
+            break;
+        case 9600: speed = B9600;
+            break;
+        case 19200: speed = B19200;
+            break;
+        case 38400: speed = B38400;
+            break;
+        case 57600: speed = B57600;
+            break;
+        case 115200: speed = B115200;
+            break;
+        case 230400: speed = B230400;
+            break;
+        case 460800: speed = B460800;
+            break;
+        case 500000: speed = B500000;
+            break;
+        default:    //默认配置为115200
+            speed = B9600;
+            // printf("default baud rate: 9600\n");
+            break;
+    }
+
+    if (0 > cfsetspeed(&new_cfg, speed)) 
+    {
+        fprintf(stderr, "cfsetspeed error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    /* 设置数据位大小 */
+    new_cfg.c_cflag &= ~CSIZE;  //将数据位相关的比特位清零
+    switch (cfg->dbit) {
+        case 5:
+            new_cfg.c_cflag |= CS5;
+            break;
+        case 6:
+            new_cfg.c_cflag |= CS6;
+            break;
+        case 7:
+            new_cfg.c_cflag |= CS7;
+            break;
+        case 8:
+            new_cfg.c_cflag |= CS8;
+            break;
+        default:    //默认数据位大小为8
+            new_cfg.c_cflag |= CS8;
+            // printf("default data bit size: 8\n");
+            break;
+    }
+
+    /* 设置奇偶校验 */
+    switch (cfg->parity) {
+        case 'N':       //无校验
+            new_cfg.c_cflag &= ~PARENB;
+            new_cfg.c_iflag &= ~INPCK;
+            break;
+        case 'O':       //奇校验
+            new_cfg.c_cflag |= (PARODD | PARENB);
+            new_cfg.c_iflag |= INPCK;
+            break;
+        case 'E':       //偶校验
+            new_cfg.c_cflag |= PARENB;
+            new_cfg.c_cflag &= ~PARODD; /* 清除PARODD标志，配置为偶校验 */
+            new_cfg.c_iflag |= INPCK;
+            break;
+        default:    //默认配置为无校验
+            new_cfg.c_cflag &= ~PARENB;
+            new_cfg.c_iflag &= ~INPCK;
+            // printf("default parity: N\n");
+            break;
+    }
+
+    /* 设置停止位 */
+    switch (cfg->sbit) {
+        case 1:     //1个停止位
+            new_cfg.c_cflag &= ~CSTOPB;
+            break;
+        case 2:     //2个停止位
+            new_cfg.c_cflag |= CSTOPB;
+            break;
+        default:    //默认配置为1个停止位
+            new_cfg.c_cflag &= ~CSTOPB;
+            // printf("default stop bit size: 1\n");
+            break;
+    }
+
+    /* 将MIN和TIME设置为0 */
+    new_cfg.c_cc[VTIME] = 0;
+    new_cfg.c_cc[VMIN] = 0;
+
+    /* 清空缓冲区 */
+    if (0 > tcflush(fd[pos], TCIOFLUSH)) {
+        fprintf(stderr, "tcflush error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    /* 写入配置、使配置生效 */
+    if (0 > tcsetattr(fd[pos], TCSANOW, &new_cfg)) {
+        fprintf(stderr, "tcsetattr error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    /* 配置OK 退出 */
+    return 0;
+}
+/***********************************WTGPS*********************************************/
+void cb_wtgps_test_singal()
+{
+    /* 清零操作 */
+    bzero(WTGPS_GPS_Save_Data.Data,sizeof(WTGPS_GPS_Save_Data.Data));
+    bzero(WTGPS_GPS_Save_Data.GNRMC,sizeof(WTGPS_GPS_Save_Data.GNRMC));
+    bzero(WTGPS_GPS_Save_Data.GNGGA,sizeof(WTGPS_GPS_Save_Data.GNGGA));
+    bzero(WTGPS_GPS_Save_Data.GNVTG,sizeof(WTGPS_GPS_Save_Data.GNVTG));
+    bzero(WTGPS_GPS_Save_Data.GPS_Buffer,sizeof(WTGPS_GPS_Save_Data.GPS_Buffer));   
+    
+    //初始化帧GNRMC 帧数据
+    WTGPS_GNRMC.pos = 0;
+    WTGPS_GNRMC.start = nullptr;
+    WTGPS_GNRMC.end = nullptr;
+    WTGPS_GNRMC.find = false;
+    WTGPS_GNRMC.Give_up = false;
+
+    //初始化帧GNGGA 帧数据
+    WTGPS_GNGGA.pos = 0;
+    WTGPS_GNGGA.start = nullptr;
+    WTGPS_GNGGA.end = nullptr;
+    WTGPS_GNGGA.find = false;
+    WTGPS_GNGGA.Give_up = false;
+
+    //初始化帧GNVTG 帧数据
+    WTGPS_GNVTG.pos = 0;
+    WTGPS_GNVTG.start = nullptr;
+    WTGPS_GNVTG.end = nullptr;
+    WTGPS_GNVTG.find = false;
+    WTGPS_GNVTG.Give_up = false;
+
+    int re_value = 0;//每次获取的一帧数据
+    int flag = 1;//获取数据和处理数据互斥标志位
+    int count = 0;//获取填充数据的有效数据次数
+    WTGPS_GPS_Save_Data.m_read_idx = 0;//用以限制获取的数据量
+    char * buf = WTGPS_GPS_Save_Data.GPS_Buffer;
+
+    uart_cfg_t cfg = {0};
+    //串口初始
+    WTGPS_gps_uart_init("/dev/ttyUSB0");
+    //设置串口参数 115200 8 1 无校验
+    WTGPS_gps_uart_cfg(&cfg);
+    int ret = 0;
+    int pos = -1;
+     /*第一步，串口初始化*/
+    for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
+    {
+        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        {
+            pos = it->second;
+            break;
+        }
+        else
+        {
+            printf("cb_brt_test pos_map没找到 %d\r\n",__LINE__);
+        }
+    }
+    while(Get_isstop(pos) != true)
+    {
+
+        if(flag == 1)
+        {
+            re_value = read(fd[pos], WTGPS_GPS_Save_Data.Data, WTGPS_GPS_Buffer_Length_2);
+                                   
+            if(re_value > 0)
+            {
+                
+                if( WTGPS_GPS_Save_Data.m_read_idx + re_value >= WTGPS_GPS_Buffer_Length_4)
+                {
+                    WTGPS_GPS_Save_Data.m_read_idx = WTGPS_GPS_Buffer_Length_4;
+                    flag = 0;
+                }
+                else
+                {
+                    count++;
+                    WTGPS_GPS_Save_Data.m_read_idx +=  re_value;
+                }
+                if( WTGPS_GPS_Save_Data.m_read_idx < WTGPS_GPS_Buffer_Length_4)
+                {
+                    strncpy(buf,WTGPS_GPS_Save_Data.Data,re_value);
+                    buf += re_value;
+//打印读取一帧的数据
+#if 0
+                    for(int i = 0;i < re_value;i++)
+                    {
+                        printf("%c",WTGPS_GPS_Save_Data.Data[i]);
+                    }
+#endif
+                }                
+            }
+        }
+        else
+        {
+            //判断是否接收到了原始数据集
+            if(WTGPS_GPS_Save_Data.m_read_idx == WTGPS_GPS_Buffer_Length_4)
+            {
+#if 0        
+                //打印原始数据
+                for(int i = 0;i < GPS_Buffer_Length_4;i++)
+                {
+                    printf("%c",WTGPS_GPS_Save_Data.GPS_Buffer[i]);
+                }
+#endif
+#ifdef __Debug_info
+                printf("\r\n");
+#endif
+                //寻找&GNRMC  获取经纬度信息
+                for (int i = 0; i < WTGPS_GPS_Buffer_Length_4; i++)
+                {
+                    if (WTGPS_GPS_Save_Data.GPS_Buffer[i] == '$' && WTGPS_GPS_Save_Data.GPS_Buffer[i + 1] == 'G' && WTGPS_GPS_Save_Data.GPS_Buffer[i + 2] == 'N' && WTGPS_GPS_Save_Data.GPS_Buffer[i + 3] == 'R' && WTGPS_GPS_Save_Data.GPS_Buffer[i + 4] == 'M' && WTGPS_GPS_Save_Data.GPS_Buffer[i + 5] == 'C')
+                    {
+                        WTGPS_GNRMC.pos = i;
+                        WTGPS_GNRMC.find = true;//标志找到数据帧
+#ifdef __Debug_info
+                        printf(" WTGPS_GNRMC pos = %d\r\n",WTGPS_GNRMC.pos);
+                        printf("\r\n");
+#endif
+                        WTGPS_GNRMC.start = &WTGPS_GPS_Save_Data.GPS_Buffer[WTGPS_GNRMC.pos];
+                        WTGPS_GNRMC.end = strstr(WTGPS_GNRMC.start + 1,"$");
+                        if(WTGPS_GNRMC.end == nullptr)
+                        {
+                            WTGPS_GNRMC.Give_up = true;
+                            printf("放弃\r\n");
+                        }
+                        else
+                        {
+                            memcpy(WTGPS_GPS_Save_Data.GNRMC,WTGPS_GNRMC.start,WTGPS_GNRMC.end - WTGPS_GNRMC.start);
+                        }
+#ifdef __Debug_info
+                        for(int i = 0;i < GPS_Buffer_Length_3;i++)
+                        {
+
+                            printf("%c",WTGPS_GPS_Save_Data.GNRMC[i]);
+
+                        }
+#endif        
+
+#ifdef __Debug_info
+                        printf("\r\n");
+#endif
+                        break;
+                    }
+                }               
+                //寻找&GNGGA  获取海拔，卫星数量，精度因子
+                for (int i = 0; i < WTGPS_GPS_Buffer_Length_4; i++)
+                {
+                    if (WTGPS_GPS_Save_Data.GPS_Buffer[i] == '$' && WTGPS_GPS_Save_Data.GPS_Buffer[i + 1] == 'G' && WTGPS_GPS_Save_Data.GPS_Buffer[i + 2] == 'N' && WTGPS_GPS_Save_Data.GPS_Buffer[i + 3] == 'G' && WTGPS_GPS_Save_Data.GPS_Buffer[i + 4] == 'G' && WTGPS_GPS_Save_Data.GPS_Buffer[i + 5] == 'A')
+                    {
+                        WTGPS_GNGGA.pos = i;
+                        WTGPS_GNGGA.find = true;//标志找到数据帧
+#ifdef __Debug_info
+                        printf("WTGPS_GNGGA pos = %d\r\n",WTGPS_GNGGA.pos);
+                        printf("\r\n");
+#endif
+
+                        WTGPS_GNGGA.start = &WTGPS_GPS_Save_Data.GPS_Buffer[WTGPS_GNGGA.pos];
+                        WTGPS_GNGGA.end = strstr(WTGPS_GNGGA.start + 1,"$");
+                        if(WTGPS_GNGGA.end == nullptr)
+                        {
+                            WTGPS_GNGGA.Give_up = true;
+                            printf("放弃\r\n");
+                        }
+                        else
+                        {
+                            memcpy(WTGPS_GPS_Save_Data.GNGGA,WTGPS_GNGGA.start,WTGPS_GNGGA.end - WTGPS_GNGGA.start);
+                        }
+
+#ifdef __Debug_info                     
+                        for(int i = 0;i < GPS_Buffer_Length_3;i++)
+                        {
+
+                            printf("%c",WTGPS_GPS_Save_Data.GNGGA[i]);
+
+                        }
+#endif                        
+#ifdef __Debug_info
+                        printf("\r\n");
+#endif
+                        break;
+                    }
+                }
+                //寻找&GNVTG  获取航向和速率
+                for (int i = 0; i < WTGPS_GPS_Buffer_Length_4; i++)
+                {
+                    if (WTGPS_GPS_Save_Data.GPS_Buffer[i] == '$' && WTGPS_GPS_Save_Data.GPS_Buffer[i + 1] == 'G' && WTGPS_GPS_Save_Data.GPS_Buffer[i + 2] == 'N' && WTGPS_GPS_Save_Data.GPS_Buffer[i + 3] == 'V' && WTGPS_GPS_Save_Data.GPS_Buffer[i + 4] == 'T' && WTGPS_GPS_Save_Data.GPS_Buffer[i + 5] == 'G')
+                    {
+                        WTGPS_GNVTG.pos = i;
+                        WTGPS_GNVTG.find = true;//标志找到数据帧
+#ifdef __Debug_info
+                        printf("WTGPS_GNVTG pos = %d\r\n",WTGPS_GNVTG.pos);
+                        printf("\r\n");
+#endif
+
+                        WTGPS_GNVTG.start = &WTGPS_GPS_Save_Data.GPS_Buffer[WTGPS_GNVTG.pos];
+                        WTGPS_GNVTG.end = strstr(WTGPS_GNVTG.start + 1,"$");
+                        if(WTGPS_GNVTG.end == nullptr)
+                        {
+                            WTGPS_GNVTG.Give_up = true;
+                            printf("放弃\r\n");
+
+                        }
+                        else
+                        {
+                            memcpy(WTGPS_GPS_Save_Data.GNVTG,WTGPS_GNVTG.start,WTGPS_GNVTG.end - WTGPS_GNVTG.start);
+                        }
+
+#ifdef __Debug_info                       
+                        for(int i = 0;i < GPS_Buffer_Length_3;i++)
+                        {
+
+                            printf("%c",WTGPS_GPS_Save_Data.GNVTG[i]);
+
+                        }
+#endif                        
+#ifdef __Debug_info
+                        printf("\r\n");
+#endif
+                        break;
+                    }
+                }
+          
+                //判断是否找到GNRMC目标帧
+                if(WTGPS_GNRMC.find == true)
+                {
+                    WTGPS_GNRMC.find = false;
+                    //判断是否放弃当前帧，为最后一帧则放弃                                   
+                    if(WTGPS_GNRMC.Give_up != true)
+                    {   
+                        //判断当前帧是否完整
+                        char* ptr_01 = strstr(WTGPS_GPS_Save_Data.GNRMC,"E");
+                        char* ptr_02 = strstr(WTGPS_GPS_Save_Data.GNRMC,"N");
+                        char* ptr_03 = strstr(WTGPS_GPS_Save_Data.GNRMC,"A");
+                        if((ptr_01!= nullptr) && (ptr_02 != nullptr) && (ptr_03 != nullptr))
+                        {
+                            if((*ptr_01 == 'E')&&(*ptr_02 == 'N')&&(*ptr_03 == 'A'))
+                            {
+#ifdef __Debug_info
+                                printf("\r\nOK1\r\n");
+#endif
+                                WTGPS_GNRMC_calc_shuju();     
+#ifdef __Debug_info             
+                                WTGPS_printGpsBuffer();
+#endif
+                                //判断是否找到GNGGA目标帧
+                                if(WTGPS_GNGGA.find == true)
+                                {
+                                    WTGPS_GNGGA.find == false;
+                                    //判断是否放弃当前帧，为最后一帧则放弃
+                                    if(WTGPS_GNGGA.Give_up != true)
+                                    {
+                                        //判断当前帧是否完整
+                                        char* ptr_04 = strstr(WTGPS_GPS_Save_Data.GNGGA,"E");
+                                        char* ptr_05 = strstr(WTGPS_GPS_Save_Data.GNGGA,"M");
+                                        if((ptr_04 != nullptr) && (ptr_05 != nullptr))
+                                        {
+                                            if((*ptr_04  == 'E') && (*ptr_05  == 'M'))
+                                            {
+#ifdef __Debug_info
+                                                    printf("\r\nOK2\r\n");
+#endif
+                                                    WTGPS_GNGGA_calc_shuju();
+#ifdef __Debug_info
+                                                    WTGPS_printf_GNGGA();           
+#endif                                                                                
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        WTGPS_GNGGA.Give_up = false;
+                                    }
+                                }     
+                                //判断是否找到GNVTG目标帧
+                                if(WTGPS_GNVTG.find == true)
+                                { 
+                                    WTGPS_GNVTG.find = false;
+                                    //判断是否放弃当前帧，为最后一帧则放弃
+                                    if(WTGPS_GNVTG.Give_up != true)
+                                    {
+                                        //判断当前帧是否完整
+                                        char* ptr_06 = strstr(WTGPS_GPS_Save_Data.GNVTG,"T");
+                                        char* ptr_07 = strstr(WTGPS_GPS_Save_Data.GNVTG,"K");
+                                        if((ptr_06 != nullptr) && (ptr_07 != nullptr))
+                                        {
+                                            if((*ptr_06 == 'T') && (*ptr_07  == 'K'))
+                                            {
+#ifdef __Debug_info
+                                                printf("\r\nOK3\r\n");
+#endif
+                                                WTGPS_GNVTG_calc_shuju();
+#ifdef __Debug_info
+                                                WTGPS_printf_GNVTG();
+#endif                                                                                  
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        WTGPS_GNVTG.Give_up = false;
+                                    }
+                                }
+                                //重置
+                                bzero(WTGPS_GPS_Save_Data.Data,sizeof(WTGPS_GPS_Save_Data.Data));
+                                bzero(WTGPS_GPS_Save_Data.GNRMC,sizeof(WTGPS_GPS_Save_Data.GNRMC));
+                                bzero(WTGPS_GPS_Save_Data.GNGGA,sizeof(WTGPS_GPS_Save_Data.GNGGA));
+                                bzero(WTGPS_GPS_Save_Data.GNVTG,sizeof(WTGPS_GPS_Save_Data.GNVTG));
+                                bzero(WTGPS_GPS_Save_Data.GPS_Buffer,sizeof(WTGPS_GPS_Save_Data.GPS_Buffer));
+                                WTGPS_GPS_Save_Data.m_read_idx = 0;
+                                break;
+                            }  
+
+                        }
+                        else
+                        {
+                            printf("\r\nOK123\r\n");
+                        }
+                    }
+                    else
+                    {
+                        WTGPS_GNRMC.Give_up = false;
+                    }
+                }
+            }    
+            flag = 1;
+            WTGPS_GPS_Save_Data.m_read_idx = 0;
+            buf = WTGPS_GPS_Save_Data.GPS_Buffer;
+            count = 0;
+        }  
+        
+    }
+        /* 退出 */
+    tcsetattr(fd[pos], TCSANOW, &WTGPS_gps_old_cfg);   //恢复到之前的配置
+    close(fd[pos]);
+}
+//计算GNRMC
+void WTGPS_GNRMC_calc_shuju()
+{
+    char *  pre_ptr = NULL;
+    char* next_ptr = NULL;
+    pre_ptr =  strstr(GPS_Save_Data.GNRMC,",");
+
+    char usefullBuffer[2];
+    for(int i = 1;i < 7;i++)
+    {
+        pre_ptr++;
+        next_ptr =  strstr(pre_ptr,",");
+        ////printf("next_ptr = %c\r\n",*(next_ptr+ 1));
+        switch(i)
+        {
+            case 1:memcpy(GPS_Save_Data.UTCTime, pre_ptr, next_ptr - pre_ptr);break;	//获取UTC时间
+            case 2:memcpy(usefullBuffer, pre_ptr, next_ptr - pre_ptr);break;	//获取UTC时间
+            case 3:memcpy(GPS_Save_Data.latitude, pre_ptr, next_ptr - pre_ptr);break;	//获取纬度信息
+            case 4:memcpy(GPS_Save_Data.N_S, pre_ptr, next_ptr - pre_ptr);break;	//获取N/S
+            case 5:memcpy(GPS_Save_Data.longitude, pre_ptr, next_ptr - pre_ptr);break;	//获取经度信息
+            case 6:memcpy(GPS_Save_Data.E_W, pre_ptr, next_ptr - pre_ptr);break;	//获取E/W
+
+            default:break;
+        }
+        pre_ptr = next_ptr;     
+    }
+    if(usefullBuffer[0] == 'V')
+    {
+            GPS_Save_Data.isUsefull = false;
+    }        
+    else if(usefullBuffer[0] == 'A')
+    {
+            GPS_Save_Data.isUsefull = true;
+    }
+    GPS_Save_Data.isParseData = true;
+      
+}
+//计算GNGGA
+void WTGPS_GNGGA_calc_shuju()
+{
+        char *  pre_ptr = NULL;
+
+        char buf[4] = {0};
+        pre_ptr =  strstr(GPS_Save_Data.GNGGA,"E");
+        pre_ptr += 4;
+        //获取卫星数量
+        sprintf(buf,"%c%c",*pre_ptr,*(pre_ptr + 1));
+       GPS_Save_Data.raw_satellites =  atof(buf);//字符串转浮点
+        //获取精度因子
+        pre_ptr +=3;
+        sprintf(buf,"%c%c%c",*pre_ptr,*(pre_ptr + 1),*(pre_ptr + 2));
+       GPS_Save_Data.raw_hdop =  atof(buf);//字符串转浮点
+        //获取海拔
+          pre_ptr +=4;
+        sprintf(buf,"%c%c%c%c",*pre_ptr,*(pre_ptr + 1),*(pre_ptr + 2),*(pre_ptr + 3));
+       GPS_Save_Data.raw_altitude =  atof(buf);//字符串转浮点
+}
+//计算GNVTG
+void WTGPS_GNVTG_calc_shuju()
+{
+    char *  pre_ptr = NULL;
+
+    char buf[7] = {0};
+    pre_ptr =  strstr(GPS_Save_Data.GNVTG,",");
+    pre_ptr++;
+
+    //获取航向
+    sprintf(buf,"%c%c%c%c%c%c",*pre_ptr,*(pre_ptr + 1),*(pre_ptr + 2),*(pre_ptr + 3),*(pre_ptr + 4),*(pre_ptr + 5));
+
+    GPS_Save_Data.raw_course =  atof(buf);//字符串转浮点
+    //获取速率
+    pre_ptr =  strstr(pre_ptr,"N");
+        pre_ptr+= 2;
+    sprintf(buf,"%c%c%c%c",*pre_ptr,*(pre_ptr + 1),*(pre_ptr + 2),*(pre_ptr + 3));
+
+    GPS_Save_Data.raw_speed =  atof(buf);//字符串转浮点
+
+}
+//打印GNGGA
+void WTGPS_printf_GNGGA()
+{
+        printf("\r\n卫星数量 = %0.0lf\r\n",GPS_Save_Data.raw_satellites);
+        printf("\r\n精度因子 = %0.1lf\r\n",GPS_Save_Data.raw_hdop);
+        printf("\r\n海拔 = %0.1lf\r\n",GPS_Save_Data.raw_altitude);
+}
+//打印GNVTG
+void WTGPS_printf_GNVTG()
+{
+        printf("\r\n对地真北航向 = %0.2lf\r\n",GPS_Save_Data.raw_course);
+        printf("\r\n速率  = %0.2lfkm/h\r\n",GPS_Save_Data.raw_speed);
+}
+//打印相关数据
+void WTGPS_printGpsBuffer()
+{
+    double f_latitude = 0.0;
+    double f_longitude = 0.0;
+
+    if (GPS_Save_Data.isParseData)
+    {
+        GPS_Save_Data.isParseData = false;
+
+        printf("GPS_Save_Data.UTCTime = ");
+        printf(GPS_Save_Data.UTCTime);
+        printf("\r\n");
+
+        if (GPS_Save_Data.isUsefull)
+        {
+            GPS_Save_Data.isUsefull = false;
+            printf("GPS_Save_Data.latitude = ");
+            // printf(Save_Data.latitude);
+            // printf("--");
+            f_latitude = Convert_to_degrees(GPS_Save_Data.latitude);
+            printf("%lf%s", f_latitude, GPS_Save_Data.N_S);
+            printf("\r\n");
+
+            printf("GPS_Save_Data.N_S = ");
+            printf(GPS_Save_Data.N_S);
+            printf("\r\n");
+
+            printf("GPS_Save_Data.longitude = ");
+            // printf(Save_Data.longitude);
+            // printf("--");
+            f_longitude = Convert_to_degrees(GPS_Save_Data.longitude);
+            printf("%lf%s", f_longitude, GPS_Save_Data.E_W);
+            printf("\r\n");
+
+            printf("GPS_Save_Data.E_W = ");
+            printf(GPS_Save_Data.E_W);
+            printf("\r\n");
+        } else {
+            printf("GPS DATA is not usefull!\r\n");
+        }
+        printf("\r\n");
+    }
+}
+// GPS数据转化单位为度。
+double WTGPS_Convert_to_degrees(char* data)
+{
+    double temp_data = atof(data);
+    int degree = (int)(temp_data / 100);
+    double f_degree = (temp_data / 100.0 - degree)*100/60.0;
+    double result = degree + f_degree;
+    return result;
+}
+//串口初始化
+static int WTGPS_gps_uart_init(const char *device)
+{
+    int pos = -1;
+     /*第一步，串口初始化*/
+    for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
+    {
+        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        {
+            pos = it->second;
+            break;
+        }
+        else
+        {
+            printf("cb_brt_test pos_map没找到 %d\r\n",__LINE__);
+        }
+    }
+
+
+    /* 打开串口终端  使用的标志有 可读可写，告诉系统该节点不会成为进程的控制终端，非阻塞方式，读不到数据返回-1,*/
+    fd[pos] = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    if (0 > fd) {
+        fprintf(stderr, "open error: %s: %s\n", device, strerror(errno));
+        return -1;
+    }
+
+    /* 获取串口当前的配置参数 */
+    if (0 > tcgetattr(fd[pos], &WTGPS_gps_old_cfg)) 
+    {
+        fprintf(stderr, "tcgetattr error: %s\n", strerror(errno));
+        close(fd[pos]);
+        return -1;
+    }
+
+    return 0;
+}
+//串口配置
+static int WTGPS_gps_uart_cfg(const uart_cfg_t *cfg)
 {
 
     int pos = -1;
