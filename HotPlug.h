@@ -1,24 +1,22 @@
-/*************************************************
-Author:lijuncheng
-Emial:lijuncheng@jmadas.com
-Date:2020-01-11
-Description: this file mainly defines some interfaces about observing hardware hot plug and relative data structures 
-**************************************************/
+
  
-#ifndef HOT_PLUG_OBSERVER_H
-#define HOT_PLUG_OBSERVER_H
- 
+#ifndef HOTPLUG_H
+#define HOTPLUG_H
+
 enum ObserveDeviceType
 {
 	ObserveDeviceType_Block,    ///< observe block devices , such as U disk , mobile disk etc 
 	ObserveDeviceType_Tty,      ///< observe tty devices , such as serial or fake terminal device etc
+  ObserveDevType_V4l2,
 	ObserveDeviceType_All       ///< observe all devices above
+
 };
  
 enum DevType
 {
     DevType_Block,    ///< block devices , such as U disk , mobile disk etc
-    DevType_Tty       ///< tty devices , such as serial or fake terminal device etc
+    DevType_Tty,       ///< tty devices , such as serial or fake terminal device etc
+    DevType_V4l2      
 };
  
 enum DevAction

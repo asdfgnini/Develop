@@ -266,6 +266,8 @@ void observe_JY9_HotPlugEventCallback(const DevType devType,const DevAction devA
 void observe_ATGM336H_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
 /****************************WTGPS*********************************************/
 void observe_WTGPS_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
+/****************************video*********************************************/
+void observe_video_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
 
 //尾插
 int arry_insert_back(const char* devpath);
@@ -296,6 +298,9 @@ int main(int argc , char * argv[])
 {
     system("clear");
     system("echo 3 > /proc/sys/kernel/printk");
+
+
+
 
     if(argc < 1 || argc >= 2)
     {
@@ -463,9 +468,23 @@ int main(int argc , char * argv[])
             pause();
             exit(-1);
         }
+        else if(strcmp(argv[1],"-0") == 0)
+        {
+
+            //初始化热插拔服务器
+            initHotPlugObserver();
+            //注册热插拔事件回调
+            registerObserveCallback(ObserveDeviceType_All,observe_video_HotPlugEventCallback);
+            printf("系统初始化完毕\r\n");
+
+            //阻塞主线程
+            pause();
+            exit(-1);
+        }
         else
         {
             printf("\r\n请输入正确的参数!!! -h获取可用参数\r\n\r\n");    
+
             exit(-1);
         }       
     }
@@ -942,6 +961,25 @@ void observe_WTGPS_HotPlugEventCallback(const DevType devType,const DevAction de
         }
     }
 }
+/*********************************video************************************************/
+void observe_video_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
+{
+    if(strcmp(devPath,"/dev/video0") == 0)
+    {
+        if(devType == DevType_V4l2)
+        {
+            if(devAction == DevAction_Add)
+            {
+                printf("\r\n v4l2 插入\r\n");
+            }
+            else if(devAction == DevAction_Remove)
+            {
+                 printf("\r\nv4l2 拔出\r\n");
+            }
+        }
+    }
+}
+
 //插
 int arry_insert_back(const char* devpath)
 {

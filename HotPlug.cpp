@@ -54,7 +54,7 @@ void initHotPlugObserver()
  
 void unInitHotPlugObserver()
 {
-	printf(" unInitHotPlugObserver \n");
+	// printf(" unInitHotPlugObserver \n");
  
 	g_HotPlugInitMutex.lock();
  
@@ -209,7 +209,7 @@ static void observeHotPlug()
  
 			if (n <= 0 || n >= UEVENT_MSG_LEN)
 			{
-				// printf(" observeHotPlug recv n=%d bytes data , we cannot parse it \n", n);
+				printf(" observeHotPlug recv n=%d bytes data , we cannot parse it \n", n);
 				continue;
 			}
  
@@ -276,9 +276,13 @@ static void observeHotPlug()
 					continue;
 				}
 			}
-			else
+			else if(devType == DevType_Tty)
 			{
 				///< devPath is also devNode for non_block device
+				memcpy(devPath,devNode,sizeof(devNode));
+			}
+			else if(devType == DevType_V4l2)
+			{
 				memcpy(devPath,devNode,sizeof(devNode));
 			}
  
@@ -287,7 +291,7 @@ static void observeHotPlug()
 		}
 	}
  
-    //    printf(" observe hot plug thread exit \n");
+       printf(" observe hot plug thread exit \n");
  
 	close(hotPlugEventSocketFd);
  
@@ -399,10 +403,14 @@ static int parseDevType(const char * devSubsystem, DevType * devType)
 	if (strncmp(devSubsystem, "block", 5) == 0)             ///< found a block device 
 	{
 		*devType = DevType_Block;
-        }
+	}
 	else if (strncmp(devSubsystem, "tty", 3) == 0)  	///< found a tty device
 	{
 		*devType = DevType_Tty;
+	}
+	else if(strncmp(devSubsystem, "video4linux", 11) == 0)
+	{
+		*devType = DevType_V4l2;
 	}
 	else
 	{
@@ -448,15 +456,15 @@ static int mountDevNodeToDevPath(const char * devNode, const char * devPath)
  
 		if (createDevMountPathRet == FAIL)
 		{
-			printf(" mountDevNodeToDevPath create devPath %s fail , please check whether current process's owner's power to create dir under %s \n", devPath, MOUNT_BASE_PATH);
+			// printf(" mountDevNodeToDevPath create devPath %s fail , please check whether current process's owner's power to create dir under %s \n", devPath, MOUNT_BASE_PATH);
 			return FAIL;
 		}
  
-		printf(" mountDevNodeToDevPath devPath %s create success \n", devPath);
+		// printf(" mountDevNodeToDevPath devPath %s create success \n", devPath);
 	}
 	else
 	{
-		printf(" mountDevNodeToDevPath devPath %s has exist \n", devPath);
+		// printf(" mountDevNodeToDevPath devPath %s has exist \n", devPath);
 	}
  
 	///< mount devNode to devPath
@@ -464,11 +472,11 @@ static int mountDevNodeToDevPath(const char * devNode, const char * devPath)
  
 	if (mountDevPathRet != 0)
 	{
-		printf("mountDevNodeToDevPath mount %s to %s fail mountDevPathRet=%d !\n", devNode, devPath, mountDevPathRet);
+		// printf("mountDevNodeToDevPath mount %s to %s fail mountDevPathRet=%d !\n", devNode, devPath, mountDevPathRet);
 		return FAIL;
 	}
  
-	printf("mountDevNodeToDevPath mount %s to %s success !\n", devNode, devPath);
+	// printf("mountDevNodeToDevPath mount %s to %s success !\n", devNode, devPath);
  
 	return SUCCESS;
 }
@@ -535,6 +543,9 @@ static void callbackDevEvent(DevType devType,DevAction devAction,const char * de
 		break;
 	case DevType_Tty:
 		observeDeviceType = ObserveDeviceType_Tty;
+		break;
+	case DevType_V4l2:
+		observeDeviceType = ObserveDevType_V4l2;
 		break;
 	default:
 		printf("callbackDevEvent unhandled devType=%d \n", devType);
