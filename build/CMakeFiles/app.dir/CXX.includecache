@@ -1,0 +1,42 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/zjt/vscode/develop/HotPlug.h
+
+/home/zjt/vscode/develop/main.cpp
+HotPlug.h
+/home/zjt/vscode/develop/HotPlug.h
+stdio.h
+-
+unistd.h
+-
+stdlib.h
+-
+sys/types.h
+-
+sys/stat.h
+-
+fcntl.h
+-
+string.h
+-
+termios.h
+-
+stdbool.h
+-
+map
+-
+iostream
+-
+thread
+-
+string
+-
+mutex
+-
+

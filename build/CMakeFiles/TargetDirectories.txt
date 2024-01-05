@@ -1,0 +1,3 @@
+/home/zjt/vscode/develop/build/CMakeFiles/rebuild_cache.dir
+/home/zjt/vscode/develop/build/CMakeFiles/edit_cache.dir
+/home/zjt/vscode/develop/build/CMakeFiles/app.dir

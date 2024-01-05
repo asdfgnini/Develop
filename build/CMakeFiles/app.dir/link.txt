@@ -1,0 +1,1 @@
+g++   -std=c++11 -pthread   CMakeFiles/app.dir/main.cpp.o CMakeFiles/app.dir/HotPlug.cpp.o  -o app 

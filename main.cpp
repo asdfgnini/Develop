@@ -317,6 +317,9 @@ int main(int argc , char * argv[])
         }
         else if(strcmp(argv[1],"-all") == 0)
         {
+            printf("\r\n暂未开发, 敬请期待!!!\r\n");
+            exit(-1);
+
             //注册设备回调表
             dev_map.insert(std::pair<const char*,function_type>("/dev/ttyUSB0",cb_brt_test));
            
@@ -603,6 +606,7 @@ void observe_BRT_HotPlugEventCallback(const DevType devType,const DevAction devA
                 {
                     if(strcmp(devPath,"/dev/ttyUSB0") == 0)
                     {
+                        system("sudo chmod 777 /dev/ttyUSB0");
                         auto iter = pos_map.find("/dev/ttyUSB0");
                         if(iter != pos_map.end())
                         {
@@ -661,6 +665,7 @@ void observe_OID_HotPlugEventCallback(const DevType devType,const DevAction devA
                 {
                     if(strcmp(devPath,"/dev/ttyUSB0") == 0)
                     {
+                        system("sudo chmod 777 /dev/ttyUSB0");
                         auto iter = pos_map.find("/dev/ttyUSB0");
                         if(iter != pos_map.end())
                         {
@@ -719,6 +724,7 @@ void observe_WIT_HotPlugEventCallback(const DevType devType,const DevAction devA
                 {
                     if(strcmp(devPath,"/dev/ttyUSB0") == 0)
                     {
+                        system("sudo chmod 777 /dev/ttyUSB0");
                         auto iter = pos_map.find("/dev/ttyUSB0");
                         if(iter != pos_map.end())
                         {
@@ -776,6 +782,7 @@ void observe_JY9_HotPlugEventCallback(const DevType devType,const DevAction devA
                 {
                     if(strcmp(devPath,"/dev/ttyUSB0") == 0)
                     {
+                        system("sudo chmod 777 /dev/ttyUSB0");
                         auto iter = pos_map.find("/dev/ttyUSB0");
                         if(iter != pos_map.end())
                         {
@@ -833,6 +840,7 @@ void observe_ATGM336H_HotPlugEventCallback(const DevType devType,const DevAction
                 {
                     if(strcmp(devPath,"/dev/ttyUSB0") == 0)
                     {
+                        system("sudo chmod 777 /dev/ttyUSB0");
                         auto iter = pos_map.find("/dev/ttyUSB0");
                         if(iter != pos_map.end())
                         {
@@ -890,6 +898,7 @@ void observe_WTGPS_HotPlugEventCallback(const DevType devType,const DevAction de
                 {
                     if(strcmp(devPath,"/dev/ttyUSB0") == 0)
                     {
+                        system("sudo chmod 777 /dev/ttyUSB0");
                         auto iter = pos_map.find("/dev/ttyUSB0");
                         if(iter != pos_map.end())
                         {
@@ -1346,7 +1355,7 @@ void cb_oid_test_singal()
     OID_Save_Data.order[3] = 0x03;
     OID_Save_Data.order[4] = 0x00;
     OID_Save_Data.order[5] = 0x01;
-    OID_Save_Data.order[6] = 0x84;
+    OID_Save_Data.order[6] = 0x74;
     OID_Save_Data.order[7] = 0x0A;
 	
     while(Get_isstop(pos) != true)
@@ -1931,7 +1940,7 @@ void cb_jy9_test_singal()
         usleep(100000);
     }
     /* 退出 */
-    tcsetattr(fd[pos], TCSANOW, &wit_old_cfg);   //恢复到之前的配置
+    tcsetattr(fd[pos], TCSANOW, &JY9_old_cfg);   //恢复到之前的配置
     close(fd[pos]);
 }
 //串口初始化
@@ -2490,7 +2499,7 @@ void GNGGA_calc_shuju()
 {
         char *  pre_ptr = NULL;
 
-        char buf[4] = {0};
+        char buf[5] = {0};
         pre_ptr =  strstr(GPS_Save_Data.GNGGA,"E");
         pre_ptr += 4;
         //获取卫星数量
@@ -2550,7 +2559,7 @@ void printGpsBuffer()
         GPS_Save_Data.isParseData = false;
 
         printf("GPS_Save_Data.UTCTime = ");
-        printf(GPS_Save_Data.UTCTime);
+        printf("%s",GPS_Save_Data.UTCTime);
         printf("\r\n");
 
         if (GPS_Save_Data.isUsefull)
@@ -2564,7 +2573,7 @@ void printGpsBuffer()
             printf("\r\n");
 
             printf("GPS_Save_Data.N_S = ");
-            printf(GPS_Save_Data.N_S);
+            printf("%s",GPS_Save_Data.N_S);
             printf("\r\n");
 
             printf("GPS_Save_Data.longitude = ");
@@ -2575,7 +2584,7 @@ void printGpsBuffer()
             printf("\r\n");
 
             printf("GPS_Save_Data.E_W = ");
-            printf(GPS_Save_Data.E_W);
+            printf("%s",GPS_Save_Data.E_W);
             printf("\r\n");
         } else {
             printf("GPS DATA is not usefull!\r\n");
@@ -3146,7 +3155,7 @@ void WTGPS_GNGGA_calc_shuju()
 {
         char *  pre_ptr = NULL;
 
-        char buf[4] = {0};
+        char buf[5] = {0};
         pre_ptr =  strstr(GPS_Save_Data.GNGGA,"E");
         pre_ptr += 4;
         //获取卫星数量
@@ -3206,7 +3215,7 @@ void WTGPS_printGpsBuffer()
         GPS_Save_Data.isParseData = false;
 
         printf("GPS_Save_Data.UTCTime = ");
-        printf(GPS_Save_Data.UTCTime);
+        printf("%s",GPS_Save_Data.UTCTime);
         printf("\r\n");
 
         if (GPS_Save_Data.isUsefull)
@@ -3220,7 +3229,7 @@ void WTGPS_printGpsBuffer()
             printf("\r\n");
 
             printf("GPS_Save_Data.N_S = ");
-            printf(GPS_Save_Data.N_S);
+            printf("%s",GPS_Save_Data.N_S);
             printf("\r\n");
 
             printf("GPS_Save_Data.longitude = ");
@@ -3231,7 +3240,7 @@ void WTGPS_printGpsBuffer()
             printf("\r\n");
 
             printf("GPS_Save_Data.E_W = ");
-            printf(GPS_Save_Data.E_W);
+            printf("%s",GPS_Save_Data.E_W);
             printf("\r\n");
         } else {
             printf("GPS DATA is not usefull!\r\n");
