@@ -53,7 +53,7 @@ CMAKE_BINARY_DIR = /home/zjt/vscode/develop/build
 # Directory level rules for the build root directory
 
 # The main recursive "all" target.
-all: CMakeFiles/app.dir/all
+all: CMakeFiles/rk3588.dir/all
 
 .PHONY : all
 
@@ -63,36 +63,36 @@ preinstall:
 .PHONY : preinstall
 
 # The main recursive "clean" target.
-clean: CMakeFiles/app.dir/clean
+clean: CMakeFiles/rk3588.dir/clean
 
 .PHONY : clean
 
 #=============================================================================
-# Target rules for target CMakeFiles/app.dir
+# Target rules for target CMakeFiles/rk3588.dir
 
 # All Build rule for target.
-CMakeFiles/app.dir/all:
-	$(MAKE) -f CMakeFiles/app.dir/build.make CMakeFiles/app.dir/depend
-	$(MAKE) -f CMakeFiles/app.dir/build.make CMakeFiles/app.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zjt/vscode/develop/build/CMakeFiles --progress-num=1,2,3 "Built target app"
-.PHONY : CMakeFiles/app.dir/all
+CMakeFiles/rk3588.dir/all:
+	$(MAKE) -f CMakeFiles/rk3588.dir/build.make CMakeFiles/rk3588.dir/depend
+	$(MAKE) -f CMakeFiles/rk3588.dir/build.make CMakeFiles/rk3588.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/zjt/vscode/develop/build/CMakeFiles --progress-num=1,2,3 "Built target rk3588"
+.PHONY : CMakeFiles/rk3588.dir/all
 
 # Build rule for subdir invocation for target.
-CMakeFiles/app.dir/rule: cmake_check_build_system
+CMakeFiles/rk3588.dir/rule: cmake_check_build_system
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/zjt/vscode/develop/build/CMakeFiles 3
-	$(MAKE) -f CMakeFiles/Makefile2 CMakeFiles/app.dir/all
+	$(MAKE) -f CMakeFiles/Makefile2 CMakeFiles/rk3588.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/zjt/vscode/develop/build/CMakeFiles 0
-.PHONY : CMakeFiles/app.dir/rule
+.PHONY : CMakeFiles/rk3588.dir/rule
 
 # Convenience name for target.
-app: CMakeFiles/app.dir/rule
+rk3588: CMakeFiles/rk3588.dir/rule
 
-.PHONY : app
+.PHONY : rk3588
 
 # clean rule for target.
-CMakeFiles/app.dir/clean:
-	$(MAKE) -f CMakeFiles/app.dir/build.make CMakeFiles/app.dir/clean
-.PHONY : CMakeFiles/app.dir/clean
+CMakeFiles/rk3588.dir/clean:
+	$(MAKE) -f CMakeFiles/rk3588.dir/build.make CMakeFiles/rk3588.dir/clean
+.PHONY : CMakeFiles/rk3588.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

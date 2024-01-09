@@ -111,17 +111,17 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named app
+# Target rules for targets named rk3588
 
 # Build rule for target.
-app: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 app
-.PHONY : app
+rk3588: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 rk3588
+.PHONY : rk3588
 
 # fast build rule for target.
-app/fast:
-	$(MAKE) -f CMakeFiles/app.dir/build.make CMakeFiles/app.dir/build
-.PHONY : app/fast
+rk3588/fast:
+	$(MAKE) -f CMakeFiles/rk3588.dir/build.make CMakeFiles/rk3588.dir/build
+.PHONY : rk3588/fast
 
 HotPlug.o: HotPlug.cpp.o
 
@@ -129,7 +129,7 @@ HotPlug.o: HotPlug.cpp.o
 
 # target to build an object file
 HotPlug.cpp.o:
-	$(MAKE) -f CMakeFiles/app.dir/build.make CMakeFiles/app.dir/HotPlug.cpp.o
+	$(MAKE) -f CMakeFiles/rk3588.dir/build.make CMakeFiles/rk3588.dir/HotPlug.cpp.o
 .PHONY : HotPlug.cpp.o
 
 HotPlug.i: HotPlug.cpp.i
@@ -138,7 +138,7 @@ HotPlug.i: HotPlug.cpp.i
 
 # target to preprocess a source file
 HotPlug.cpp.i:
-	$(MAKE) -f CMakeFiles/app.dir/build.make CMakeFiles/app.dir/HotPlug.cpp.i
+	$(MAKE) -f CMakeFiles/rk3588.dir/build.make CMakeFiles/rk3588.dir/HotPlug.cpp.i
 .PHONY : HotPlug.cpp.i
 
 HotPlug.s: HotPlug.cpp.s
@@ -147,7 +147,7 @@ HotPlug.s: HotPlug.cpp.s
 
 # target to generate assembly for a file
 HotPlug.cpp.s:
-	$(MAKE) -f CMakeFiles/app.dir/build.make CMakeFiles/app.dir/HotPlug.cpp.s
+	$(MAKE) -f CMakeFiles/rk3588.dir/build.make CMakeFiles/rk3588.dir/HotPlug.cpp.s
 .PHONY : HotPlug.cpp.s
 
 main.o: main.cpp.o
@@ -156,7 +156,7 @@ main.o: main.cpp.o
 
 # target to build an object file
 main.cpp.o:
-	$(MAKE) -f CMakeFiles/app.dir/build.make CMakeFiles/app.dir/main.cpp.o
+	$(MAKE) -f CMakeFiles/rk3588.dir/build.make CMakeFiles/rk3588.dir/main.cpp.o
 .PHONY : main.cpp.o
 
 main.i: main.cpp.i
@@ -165,7 +165,7 @@ main.i: main.cpp.i
 
 # target to preprocess a source file
 main.cpp.i:
-	$(MAKE) -f CMakeFiles/app.dir/build.make CMakeFiles/app.dir/main.cpp.i
+	$(MAKE) -f CMakeFiles/rk3588.dir/build.make CMakeFiles/rk3588.dir/main.cpp.i
 .PHONY : main.cpp.i
 
 main.s: main.cpp.s
@@ -174,7 +174,7 @@ main.s: main.cpp.s
 
 # target to generate assembly for a file
 main.cpp.s:
-	$(MAKE) -f CMakeFiles/app.dir/build.make CMakeFiles/app.dir/main.cpp.s
+	$(MAKE) -f CMakeFiles/rk3588.dir/build.make CMakeFiles/rk3588.dir/main.cpp.s
 .PHONY : main.cpp.s
 
 # Help Target
@@ -185,7 +185,7 @@ help:
 	@echo "... depend"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
-	@echo "... app"
+	@echo "... rk3588"
 	@echo "... HotPlug.o"
 	@echo "... HotPlug.i"
 	@echo "... HotPlug.s"

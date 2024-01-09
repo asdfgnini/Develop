@@ -18,6 +18,42 @@ using namespace std;
 
 // #define __Debug_info
 
+//同时支持的设备数目
+#define dev_num 10
+
+const char* dev_name[dev_num] = {
+      "/dev/ttyUSB0",
+      "/dev/ttyUSB1",
+      "/dev/ttyUSB2",
+      "/dev/ttyUSB3",  
+      "/dev/ttyUSB4",  
+      "/dev/ttyUSB5"  
+};
+
+const char* order_info[dev_num] = {
+    "sudo chmod 777 /dev/ttyUSB0",
+    "sudo chmod 777 /dev/ttyUSB1",
+    "sudo chmod 777 /dev/ttyUSB2",
+    "sudo chmod 777 /dev/ttyUSB3",
+    "sudo chmod 777 /dev/ttyUSB4",
+    "sudo chmod 777 /dev/ttyUSB5"
+};
+
+std::map<const char*,int> dev_order;
+
+
+                           
+string port[dev_num] = {""};
+int fd[dev_num] = {-1};
+bool isstop[dev_num] = {false};
+mutex mtx_stop;
+bool isonline[dev_num] = {false};
+
+typedef void (*function_type)();
+std::map<const char*,int> pos_map;
+std::map<const char*,function_type> dev_map;
+
+
 typedef struct uart_hardware_cfg {
     unsigned int baudrate;      /* 波特率 */
     unsigned char dbit;         /* 数据位 */
@@ -57,7 +93,7 @@ typedef struct OID_SaveData
 OID_SaveData OID_Save_Data;
 int oid_getIndexOfSigns(char ch);
 long oid_hexToDec(char* source);
-
+void cb_oid_test();
 void cb_oid_test_singal();
 
 /****************************位置*********************************************/
@@ -278,32 +314,34 @@ bool Get_isstop(int pos);
 //停止
 void stop_Thread(int pos , bool states);
 
-//是否打开调试信息
-// #define __Debug_info
-
-//同时支持的设备数目
-#define dev_num 10
-                           
-string port[dev_num] = {""};
-int fd[dev_num] = {-1};
-bool isstop[dev_num] = {false};
-mutex mtx_stop;
-bool isonline[dev_num] = {false};
-
-typedef void (*function_type)();
-std::map<const char*,int> pos_map;
-std::map<const char*,function_type> dev_map;
 
 int main(int argc , char * argv[])
 {
     system("clear");
-    system("echo 3 > /proc/sys/kernel/printk");
-
-
-
+    // system("echo 3 > /proc/sys/kernel/printk");
 
     if(argc < 1 || argc >= 2)
     {
+        if(strcmp(argv[1],"-all") == 0)
+        {
+
+            dev_order.insert(std::pair<const char*,int>("brt",0));
+            dev_order.insert(std::pair<const char*,int>("oid",1));
+            dev_order.insert(std::pair<const char*,int>("wit",2));
+            dev_order.insert(std::pair<const char*,int>("jy9",3));
+            dev_order.insert(std::pair<const char*,int>("atgm",4));
+            dev_order.insert(std::pair<const char*,int>("wtgps",5));
+        }
+        else
+        {
+            dev_order.insert(std::pair<const char*,int>("brt",0));
+            dev_order.insert(std::pair<const char*,int>("oid",0));
+            dev_order.insert(std::pair<const char*,int>("wit",0));
+            dev_order.insert(std::pair<const char*,int>("jy9",0));
+            dev_order.insert(std::pair<const char*,int>("atgm",0));
+            dev_order.insert(std::pair<const char*,int>("wtgps",0));
+        }
+
         if(strcmp(argv[1],"-h") == 0)
         {
             printf("*****************速度******************\r\n");
@@ -324,9 +362,15 @@ int main(int argc , char * argv[])
         {
             printf("\r\n暂未开发, 敬请期待!!!\r\n");
             exit(-1);
-
+            int loaction = -1;
+            auto iter_order = dev_order.find("atgm");
+            if(iter_order != pos_map.end())
+            {
+                loaction = iter_order->second;
+            }
             //注册设备回调表
             dev_map.insert(std::pair<const char*,function_type>("/dev/ttyUSB0",cb_brt_test));
+            dev_map.insert(std::pair<const char*,function_type>("/dev/ttyUSB1",cb_oid_test));
            
 #ifdef __Debug_info 
             //注册设备号相对位置表
@@ -345,6 +389,7 @@ int main(int argc , char * argv[])
 #endif 
             //注册设备号相对位置表
             pos_map.insert(std::pair<const char*,int>("/dev/ttyUSB0",0));
+            pos_map.insert(std::pair<const char*,int>("/dev/ttyUSB1",1));
 
 
 #ifdef __Debug_info
@@ -374,10 +419,22 @@ int main(int argc , char * argv[])
         } 
         else if(strcmp(argv[1],"-brt") == 0)
         {
+            int loaction = -1;
+            auto iter_order = dev_order.find("brt");
+            if(iter_order != pos_map.end())
+            {
+                loaction = iter_order->second;
+            }
+            // printf("loaction=%d\r\n",loaction);
             //注册设备回调表
-            dev_map.insert(std::pair<const char*,function_type>("/dev/ttyUSB0",cb_brt_test_singal));
+            dev_map.insert(std::pair<const char*,function_type>(dev_name[loaction],cb_brt_test_singal));
             //注册设备号相对位置表
-            pos_map.insert(std::pair<const char*,int>("/dev/ttyUSB0",0));
+            pos_map.insert(std::pair<const char*,int>(dev_name[loaction],loaction));
+
+            // for(map<const char*,function_type>::iterator it=dev_map.begin();it!=dev_map.end();it++)
+            // {
+            //     cout <<"[dev_map]: " << "key:" <<it->first<<" value:"<<it->second<<endl;
+            // }
             //初始化热插拔服务器
             initHotPlugObserver();
             //注册热插拔事件回调
@@ -390,10 +447,17 @@ int main(int argc , char * argv[])
         }
         else if(strcmp(argv[1],"-oid") == 0)
         {
+            int loaction = -1;
+            auto iter_order = dev_order.find("oid");
+            if(iter_order != pos_map.end())
+            {
+                loaction = iter_order->second;
+            }
+            // printf("loaction=%d\r\n",loaction);
             //注册设备回调表
-            dev_map.insert(std::pair<const char*,function_type>("/dev/ttyUSB0",cb_oid_test_singal));
+            dev_map.insert(std::pair<const char*,function_type>(dev_name[loaction],cb_oid_test_singal));
             //注册设备号相对位置表
-            pos_map.insert(std::pair<const char*,int>("/dev/ttyUSB0",0));
+            pos_map.insert(std::pair<const char*,int>(dev_name[loaction],loaction));
             //初始化热插拔服务器
             initHotPlugObserver();
             //注册热插拔事件回调
@@ -406,10 +470,17 @@ int main(int argc , char * argv[])
         }
         else if(strcmp(argv[1],"-wit") == 0)
         {
+            int loaction = -1;
+            auto iter_order = dev_order.find("wit");
+            if(iter_order != pos_map.end())
+            {
+                loaction = iter_order->second;
+            }
+            // printf("loaction=%d\r\n",loaction);
             //注册设备回调表
-            dev_map.insert(std::pair<const char*,function_type>("/dev/ttyUSB0",cb_wit_test_singal));
+            dev_map.insert(std::pair<const char*,function_type>(dev_name[loaction],cb_wit_test_singal));
             //注册设备号相对位置表
-            pos_map.insert(std::pair<const char*,int>("/dev/ttyUSB0",0));
+            pos_map.insert(std::pair<const char*,int>(dev_name[loaction],loaction));
             //初始化热插拔服务器
             initHotPlugObserver();
             //注册热插拔事件回调
@@ -422,10 +493,17 @@ int main(int argc , char * argv[])
         }
         else if(strcmp(argv[1],"-jy9") == 0)
         {
+            int loaction = -1;
+            auto iter_order = dev_order.find("jy9");
+            if(iter_order != pos_map.end())
+            {
+                loaction = iter_order->second;
+            }
+            // printf("loaction=%d\r\n",loaction);
             //注册设备回调表
-            dev_map.insert(std::pair<const char*,function_type>("/dev/ttyUSB0",cb_jy9_test_singal));
+            dev_map.insert(std::pair<const char*,function_type>(dev_name[loaction],cb_jy9_test_singal));
             //注册设备号相对位置表
-            pos_map.insert(std::pair<const char*,int>("/dev/ttyUSB0",0));
+            pos_map.insert(std::pair<const char*,int>(dev_name[loaction],loaction));
             //初始化热插拔服务器
             initHotPlugObserver();
             //注册热插拔事件回调
@@ -438,10 +516,17 @@ int main(int argc , char * argv[])
         }
         else if(strcmp(argv[1],"-atgm") == 0)
         {
+            int loaction = -1;
+            auto iter_order = dev_order.find("atgm");
+            if(iter_order != pos_map.end())
+            {
+                loaction = iter_order->second;
+            }
+            // printf("loaction=%d\r\n",loaction);
             //注册设备回调表
-            dev_map.insert(std::pair<const char*,function_type>("/dev/ttyUSB0",cb_gps_test_singal));
+            dev_map.insert(std::pair<const char*,function_type>(dev_name[loaction],cb_gps_test_singal));
             //注册设备号相对位置表
-            pos_map.insert(std::pair<const char*,int>("/dev/ttyUSB0",0));
+            pos_map.insert(std::pair<const char*,int>(dev_name[loaction],loaction));
             //初始化热插拔服务器
             initHotPlugObserver();
             //注册热插拔事件回调
@@ -454,10 +539,17 @@ int main(int argc , char * argv[])
         }
         else if(strcmp(argv[1],"-wtgps") == 0)
         {
+            int loaction = -1;
+            auto iter_order = dev_order.find("wtgps");
+            if(iter_order != pos_map.end())
+            {
+                loaction = iter_order->second;
+            }
+            // printf("loaction=%d\r\n",loaction);
             //注册设备回调表
-            dev_map.insert(std::pair<const char*,function_type>("/dev/ttyUSB0",cb_wtgps_test_singal));
+            dev_map.insert(std::pair<const char*,function_type>(dev_name[loaction],cb_wtgps_test_singal));
             //注册设备号相对位置表
-            pos_map.insert(std::pair<const char*,int>("/dev/ttyUSB0",0));
+            pos_map.insert(std::pair<const char*,int>(dev_name[loaction],loaction));
             //初始化热插拔服务器
             initHotPlugObserver();
             //注册热插拔事件回调
@@ -594,27 +686,37 @@ void observeALLDeviceHotPlugEventCallback(const DevType devType,const DevAction 
                 } 
             }
         }
-        //获取设备数
-        int num1 = 0;
-        for (int i = 0; i < dev_num; i++)
-        {       
-            if(port[i] == "")
-            {
-                continue;
-            }
-            else
-            {
-                num1++;
-                cout << "dev: " << port[i] << endl;
-            }
-        }
-        printf("\r\n设备数:%d\r\n",num1);
+        // //获取设备数
+        // int num1 = 0;
+        // for (int i = 0; i < dev_num; i++)
+        // {       
+        //     if(port[i] == "")
+        //     {
+        //         continue;
+        //     }
+        //     else
+        //     {
+        //         num1++;
+        //         cout << "dev: " << port[i] << endl;
+        //     }
+        // }
+        // printf("\r\n设备数:%d\r\n",num1);
     }
 }
 /*********************************brt************************************************/
 void observe_BRT_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
 {
-    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+    int loaction = -1;
+    auto iter_order = dev_order.find("brt");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
+#ifdef __Debug_info
+    printf("loaction=%d\r\n",loaction);
+    printf("%s\r\n",devPath);
+#endif
+    if(strcmp(devPath,dev_name[loaction]) == 0)
     {
         int pos = arry_insert_back(devPath);
         if(pos != -1)
@@ -622,37 +724,36 @@ void observe_BRT_HotPlugEventCallback(const DevType devType,const DevAction devA
             if(devType == DevType_Tty)
             {
                 if(devAction == DevAction_Add)
-                {
-                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+                {   
+
+                    system(order_info[loaction]);
+                    auto iter = pos_map.find(dev_name[loaction]);
+                    if(iter != pos_map.end())
                     {
-                        system("sudo chmod 777 /dev/ttyUSB0");
-                        auto iter = pos_map.find("/dev/ttyUSB0");
-                        if(iter != pos_map.end())
+                        isstop[iter->second] = false; 
+                        auto iter2 = dev_map.find(dev_name[loaction]);
+                        if(iter2 != dev_map.end())
                         {
-                            isstop[iter->second] = false; 
-                            auto iter2 = dev_map.find("/dev/ttyUSB0");
-                            if(iter2 != dev_map.end())
-                            {
-                                std::thread brt(iter2->second);
-                                brt.detach();
-                                printf("速度传感器brt插入\r\n");
-                            }
-                            else
-                            {
-                                printf("[ADD]: brt dev_map没找到 %d\r\n",__LINE__);
-                            }
+                            std::thread brt(iter2->second);
+                            brt.detach();
+                            printf("速度传感器brt插入\r\n");
                         }
                         else
                         {
-                            printf("[ADD]:brt pos_map没找到 %d\r\n",__LINE__);
+                            printf("[ADD]: brt dev_map没找到 %d\r\n",__LINE__);
                         }
-                    }  
+                    }
+                    else
+                    {
+                        printf("[ADD]:brt pos_map没找到 %d\r\n",__LINE__);
+                    }
+                
                 }
                 else if(devAction == DevAction_Remove)
                 {
-                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+                    if(strcmp(devPath,dev_name[loaction]) == 0)
                     {
-                        auto iter = pos_map.find("/dev/ttyUSB0");
+                        auto iter = pos_map.find(dev_name[loaction]);
                         if(iter != pos_map.end())
                         {
                             stop_Thread(iter->second,true);  
@@ -673,7 +774,18 @@ void observe_BRT_HotPlugEventCallback(const DevType devType,const DevAction devA
 /*********************************OID************************************************/
 void observe_OID_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
 {
-    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+
+    int loaction = -1;
+    auto iter_order = dev_order.find("oid");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
+#ifdef __Debug_info
+    printf("loaction=%d\r\n",loaction);
+    printf("%s\r\n",devPath);
+#endif
+    if(strcmp(devPath,dev_name[loaction]) == 0)
     {
         int pos = arry_insert_back(devPath);
         if(pos != -1)
@@ -682,14 +794,14 @@ void observe_OID_HotPlugEventCallback(const DevType devType,const DevAction devA
             {
                 if(devAction == DevAction_Add)
                 {
-                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+                    if(strcmp(devPath,dev_name[loaction]) == 0)
                     {
-                        system("sudo chmod 777 /dev/ttyUSB0");
-                        auto iter = pos_map.find("/dev/ttyUSB0");
+                        system(order_info[loaction]);
+                        auto iter = pos_map.find(dev_name[loaction]);
                         if(iter != pos_map.end())
                         {
                             isstop[iter->second] = false; 
-                            auto iter2 = dev_map.find("/dev/ttyUSB0");
+                            auto iter2 = dev_map.find(dev_name[loaction]);
                             if(iter2 != dev_map.end())
                             {
                                 std::thread brt(iter2->second);
@@ -709,9 +821,9 @@ void observe_OID_HotPlugEventCallback(const DevType devType,const DevAction devA
                 }
                 else if(devAction == DevAction_Remove)
                 {
-                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+                    if(strcmp(devPath,dev_name[loaction]) == 0)
                     {
-                        auto iter = pos_map.find("/dev/ttyUSB0");
+                        auto iter = pos_map.find(dev_name[loaction]);
                         if(iter != pos_map.end())
                         {
                             stop_Thread(iter->second,true);  
@@ -732,7 +844,17 @@ void observe_OID_HotPlugEventCallback(const DevType devType,const DevAction devA
 /*********************************WIT************************************************/
 void observe_WIT_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
 {
-    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+    int loaction = -1;
+    auto iter_order = dev_order.find("wit");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
+#ifdef __Debug_info
+    printf("loaction=%d\r\n",loaction);
+    printf("%s\r\n",devPath);
+#endif
+    if(strcmp(devPath,dev_name[loaction]) == 0)
     {
         int pos = arry_insert_back(devPath);
         if(pos != -1)
@@ -741,36 +863,36 @@ void observe_WIT_HotPlugEventCallback(const DevType devType,const DevAction devA
             {
                 if(devAction == DevAction_Add)
                 {
-                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+
+                    system(order_info[loaction]);
+
+                    auto iter = pos_map.find(dev_name[loaction]);
+                    if(iter != pos_map.end())
                     {
-                        system("sudo chmod 777 /dev/ttyUSB0");
-                        auto iter = pos_map.find("/dev/ttyUSB0");
-                        if(iter != pos_map.end())
+                        isstop[iter->second] = false; 
+                        auto iter2 = dev_map.find(dev_name[loaction]);
+                        if(iter2 != dev_map.end())
                         {
-                            isstop[iter->second] = false; 
-                            auto iter2 = dev_map.find("/dev/ttyUSB0");
-                            if(iter2 != dev_map.end())
-                            {
-                                std::thread brt(iter2->second);
-                                brt.detach();
-                                printf("姿态传感器WIT插入\r\n");
-                            }
-                            else
-                            {
-                                printf("[ADD]: WIT dev_map没找到 %d\r\n",__LINE__);
-                            }
+                            std::thread brt(iter2->second);
+                            brt.detach();
+                            printf("姿态传感器WIT插入\r\n");
                         }
                         else
                         {
-                            printf("[ADD]:WIT pos_map没找到 %d\r\n",__LINE__);
+                            printf("[ADD]: WIT dev_map没找到 %d\r\n",__LINE__);
                         }
-                    }  
+                    }
+                    else
+                    {
+                        printf("[ADD]:WIT pos_map没找到 %d\r\n",__LINE__);
+                    }
+                    
                 }
                 else if(devAction == DevAction_Remove)
                 {
-                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+                    if(strcmp(devPath,dev_name[loaction]) == 0)
                     {
-                        auto iter = pos_map.find("/dev/ttyUSB0");
+                        auto iter = pos_map.find(dev_name[loaction]);
                         if(iter != pos_map.end())
                         {
                             stop_Thread(iter->second,true);  
@@ -790,7 +912,17 @@ void observe_WIT_HotPlugEventCallback(const DevType devType,const DevAction devA
 /*********************************JY9************************************************/
 void observe_JY9_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
 {
-    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+    int loaction = -1;
+    auto iter_order = dev_order.find("jy9");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
+#ifdef __Debug_info
+    printf("loaction=%d\r\n",loaction);
+    printf("%s\r\n",devPath);
+#endif
+    if(strcmp(devPath,dev_name[loaction]) == 0)
     {
         int pos = arry_insert_back(devPath);
         if(pos != -1)
@@ -799,36 +931,34 @@ void observe_JY9_HotPlugEventCallback(const DevType devType,const DevAction devA
             {
                 if(devAction == DevAction_Add)
                 {
-                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+                    system(order_info[loaction]);
+                    auto iter = pos_map.find(dev_name[loaction]);
+                    if(iter != pos_map.end())
                     {
-                        system("sudo chmod 777 /dev/ttyUSB0");
-                        auto iter = pos_map.find("/dev/ttyUSB0");
-                        if(iter != pos_map.end())
+                        isstop[iter->second] = false; 
+                        auto iter2 = dev_map.find(dev_name[loaction]);
+                        if(iter2 != dev_map.end())
                         {
-                            isstop[iter->second] = false; 
-                            auto iter2 = dev_map.find("/dev/ttyUSB0");
-                            if(iter2 != dev_map.end())
-                            {
-                                std::thread brt(iter2->second);
-                                brt.detach();
-                                printf("姿态传感器JY901B插入\r\n");
-                            }
-                            else
-                            {
-                                printf("[ADD]: JY9 dev_map没找到 %d\r\n",__LINE__);
-                            }
+                            std::thread brt(iter2->second);
+                            brt.detach();
+                            printf("姿态传感器JY901B插入\r\n");
                         }
                         else
                         {
-                            printf("[ADD]:JY9 pos_map没找到 %d\r\n",__LINE__);
+                            printf("[ADD]: JY9 dev_map没找到 %d\r\n",__LINE__);
                         }
-                    }  
+                    }
+                    else
+                    {
+                        printf("[ADD]:JY9 pos_map没找到 %d\r\n",__LINE__);
+                    }
+                     
                 }
                 else if(devAction == DevAction_Remove)
                 {
-                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+                    if(strcmp(devPath,dev_name[loaction]) == 0)
                     {
-                        auto iter = pos_map.find("/dev/ttyUSB0");
+                        auto iter = pos_map.find(dev_name[loaction]);
                         if(iter != pos_map.end())
                         {
                             stop_Thread(iter->second,true);  
@@ -848,7 +978,15 @@ void observe_JY9_HotPlugEventCallback(const DevType devType,const DevAction devA
 /*********************************ATGM336H************************************************/
 void observe_ATGM336H_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
 {
-    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+    int loaction = -1;
+    auto iter_order = dev_order.find("atgm");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
+
+
+    if(strcmp(devPath,dev_name[loaction]) == 0)
     {
         int pos = arry_insert_back(devPath);
         if(pos != -1)
@@ -857,36 +995,35 @@ void observe_ATGM336H_HotPlugEventCallback(const DevType devType,const DevAction
             {
                 if(devAction == DevAction_Add)
                 {
-                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+
+                    system(order_info[loaction]);
+                    auto iter = pos_map.find(dev_name[loaction]);
+                    if(iter != pos_map.end())
                     {
-                        system("sudo chmod 777 /dev/ttyUSB0");
-                        auto iter = pos_map.find("/dev/ttyUSB0");
-                        if(iter != pos_map.end())
+                        isstop[iter->second] = false; 
+                        auto iter2 = dev_map.find(dev_name[loaction]);
+                        if(iter2 != dev_map.end())
                         {
-                            isstop[iter->second] = false; 
-                            auto iter2 = dev_map.find("/dev/ttyUSB0");
-                            if(iter2 != dev_map.end())
-                            {
-                                std::thread brt(iter2->second);
-                                brt.detach();
-                                printf("位置传感器ATGM336h插入\r\n");
-                            }
-                            else
-                            {
-                                printf("[ADD]: ATGM336h dev_map没找到 %d\r\n",__LINE__);
-                            }
+                            std::thread brt(iter2->second);
+                            brt.detach();
+                            printf("位置传感器ATGM336h插入\r\n");
                         }
                         else
                         {
-                            printf("[ADD]:ATGM336h pos_map没找到 %d\r\n",__LINE__);
+                            printf("[ADD]: ATGM336h dev_map没找到 %d\r\n",__LINE__);
                         }
-                    }  
+                    }
+                    else
+                    {
+                        printf("[ADD]:ATGM336h pos_map没找到 %d\r\n",__LINE__);
+                    }
+                     
                 }
                 else if(devAction == DevAction_Remove)
                 {
-                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+                    if(strcmp(devPath,dev_name[loaction]) == 0)
                     {
-                        auto iter = pos_map.find("/dev/ttyUSB0");
+                        auto iter = pos_map.find(dev_name[loaction]);
                         if(iter != pos_map.end())
                         {
                             stop_Thread(iter->second,true);  
@@ -906,7 +1043,14 @@ void observe_ATGM336H_HotPlugEventCallback(const DevType devType,const DevAction
 /*********************************WTGPS+BD************************************************/
 void observe_WTGPS_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
 {
-    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+    int loaction = -1;
+    auto iter_order = dev_order.find("wtgps");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
+
+    if(strcmp(devPath,dev_name[loaction]) == 0)
     {
         int pos = arry_insert_back(devPath);
         if(pos != -1)
@@ -915,36 +1059,35 @@ void observe_WTGPS_HotPlugEventCallback(const DevType devType,const DevAction de
             {
                 if(devAction == DevAction_Add)
                 {
-                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+
+                    system(order_info[loaction]);
+                    auto iter = pos_map.find(dev_name[loaction]);
+                    if(iter != pos_map.end())
                     {
-                        system("sudo chmod 777 /dev/ttyUSB0");
-                        auto iter = pos_map.find("/dev/ttyUSB0");
-                        if(iter != pos_map.end())
+                        isstop[iter->second] = false; 
+                        auto iter2 = dev_map.find(dev_name[loaction]);
+                        if(iter2 != dev_map.end())
                         {
-                            isstop[iter->second] = false; 
-                            auto iter2 = dev_map.find("/dev/ttyUSB0");
-                            if(iter2 != dev_map.end())
-                            {
-                                std::thread brt(iter2->second);
-                                brt.detach();
-                                printf("位置传感器WTGPS插入\r\n");
-                            }
-                            else
-                            {
-                                printf("[ADD]: WTGPS dev_map没找到 %d\r\n",__LINE__);
-                            }
+                            std::thread brt(iter2->second);
+                            brt.detach();
+                            printf("位置传感器WTGPS插入\r\n");
                         }
                         else
                         {
-                            printf("[ADD]:WTGPS pos_map没找到 %d\r\n",__LINE__);
+                            printf("[ADD]: WTGPS dev_map没找到 %d\r\n",__LINE__);
                         }
-                    }  
+                    }
+                    else
+                    {
+                        printf("[ADD]:WTGPS pos_map没找到 %d\r\n",__LINE__);
+                    }
+                      
                 }
                 else if(devAction == DevAction_Remove)
                 {
-                    if(strcmp(devPath,"/dev/ttyUSB0") == 0)
+                    if(strcmp(devPath,dev_name[loaction]) == 0)
                     {
-                        auto iter = pos_map.find("/dev/ttyUSB0");
+                        auto iter = pos_map.find(dev_name[loaction]);
                         if(iter != pos_map.end())
                         {
                             stop_Thread(iter->second,true);  
@@ -1004,6 +1147,7 @@ int arry_insert_back(const char* devpath)
     if(strcmp(devpath,"/dev/ttyUSB0") == 0)
     {
         port[0] = devpath;
+
         return 0;
     }
     else if(strcmp(devpath,"/dev/ttyUSB1") == 0)
@@ -1015,6 +1159,21 @@ int arry_insert_back(const char* devpath)
     {
         port[2] = devpath;
         return 2;
+    }
+    else if(strcmp(devpath,"/dev/ttyUSB3") == 0)
+    {
+        port[3] = devpath;
+        return 3;
+    }
+    else if(strcmp(devpath,"/dev/ttyUSB4") == 0)
+    {
+        port[4] = devpath;
+        return 4;
+    }   
+    else if(strcmp(devpath,"/dev/ttyUSB5") == 0)
+    {
+        port[5] = devpath;
+        return 5;
     }
 
     return -1;
@@ -1034,8 +1193,19 @@ void array_delete_pre(const char* devpath)
     }
     else if(strcmp(devpath,"/dev/ttyUSB2") == 0)
     {
-        port[2] = "";
-       
+        port[2] = ""; 
+    }
+    else if(strcmp(devpath,"/dev/ttyUSB3") == 0)
+    {
+        port[3] = ""; 
+    }
+    else if(strcmp(devpath,"/dev/ttyUSB4") == 0)
+    {
+        port[4] = ""; 
+    }
+    else if(strcmp(devpath,"/dev/ttyUSB5") == 0)
+    {
+        port[5] = ""; 
     }
 
 }
@@ -1185,9 +1355,17 @@ void cb_brt_test_singal()
 	struct termios new_cfg={0}; //用于保存终端新配置的参数
 	speed_t speed = B9600;		//定义波特率为9600
     /*第一步，串口初始化*/
+
+    int loaction = -1;
+    auto iter_order = dev_order.find("brt");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
+
     for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
     {
-        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        if(strcmp(it->first,dev_name[loaction]) == 0)
         {
             pos = it->second;
             break;
@@ -1197,7 +1375,8 @@ void cb_brt_test_singal()
             printf("cb_brt_test pos_map没找到 %d\r\n",__LINE__);
         }
     }
-
+    // printf("pos=%d\r\n ",pos);
+    // cout << "port[pos]=" << port[pos] << endl;
 	fd[pos] = open(port[pos].c_str(),O_RDWR | O_NOCTTY | O_NDELAY);//O_NOCTTY 标志，告知系统该节点不会成为进程的控制终端
     if(fd[pos] < 0)
     {
@@ -1206,7 +1385,7 @@ void cb_brt_test_singal()
     }
 	ret = tcgetattr(fd[pos], &old_cfg);
 	if(ret < 0)
-        {
+    {
 		printf("tcgetattr error\n");
 		close(fd[pos]);
 		return;
@@ -1329,7 +1508,7 @@ long hexToDec(char* source)
     return sum;
 }
 /***********************************OID**************************************************/
-void cb_oid_test_singal()
+void cb_oid_test()
 {
     int ret,pos = -1;
 	struct termios old_cfg={0}; //用于保存终端配置之前的参数
@@ -1339,7 +1518,7 @@ void cb_oid_test_singal()
     /*第一步，串口初始化*/
     for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
     {
-        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        if(strcmp(it->first,"/dev/ttyUSB1") == 0)
         {
             pos = it->second;
             break;
@@ -1347,6 +1526,124 @@ void cb_oid_test_singal()
         else
         {
             printf("cb_brt_test pos_map没找到 %d\r\n",__LINE__);
+        }
+    }
+    
+	fd[pos] = open(port[pos].c_str(),O_RDWR | O_NOCTTY | O_NDELAY);//O_NOCTTY 标志，告知系统该节点不会成为进程的控制终端
+    if(fd[pos] < 0)
+    {
+        printf("uart device open error\n");
+        return;
+    }
+	ret = tcgetattr(fd[pos], &old_cfg);
+	if(ret < 0)
+    {
+		printf("tcgetattr error\n");
+		close(fd[pos]);
+		return;
+	}
+	/*第二步，配置串口参数*/
+	cfmakeraw(&new_cfg);//设置为原始模式 
+	new_cfg.c_cflag |= CREAD;// 使能接收 
+	cfsetspeed(&new_cfg, speed);//将波特率设置为9600
+	new_cfg.c_cflag &= ~CSIZE; //将数据位相关的比特位清零
+	new_cfg.c_cflag |= CS8;    //将数据位数设置为8位
+	new_cfg.c_cflag &= ~PARENB;
+	new_cfg.c_iflag &= ~INPCK;//设置为无校验模式
+	new_cfg.c_cflag &= ~CSTOPB;//将停止位设置为1位
+	new_cfg.c_cc[VTIME] = 0;// 将 MIN 和 TIME 设置为 0
+	new_cfg.c_cc[VMIN] = 0;
+	ret = tcflush(fd[pos], TCIOFLUSH);//清空缓冲区域
+
+    if(ret < 0)
+    {
+        printf("tcflush error\n");
+        return;
+    }
+    ret = tcsetattr(fd[pos], TCSANOW, &new_cfg);//写入配置、使配置生效
+    if(ret < 0)
+    {
+        printf("tcsetattr error\n");
+        return;
+    }	
+    OID_Save_Data.order[0] = 0x01;
+    OID_Save_Data.order[1] = 0x03;
+    OID_Save_Data.order[2] = 0x00;
+    OID_Save_Data.order[3] = 0x03;
+    OID_Save_Data.order[4] = 0x00;
+    OID_Save_Data.order[5] = 0x01;
+    OID_Save_Data.order[6] = 0x74;
+    OID_Save_Data.order[7] = 0x0A;
+	
+    while(Get_isstop(pos) != true)
+    { 
+        int ret = write(fd[pos],OID_Save_Data.order,8);
+        if(ret < 0)
+        {
+                printf("write fail\r\n");
+        }
+        bzero(OID_Save_Data.SUDU_Buffer,sizeof(OID_Save_Data.SUDU_Buffer));
+        ret = read(fd[pos],OID_Save_Data.SUDU_Buffer,10);
+        if(ret < 0)
+        {
+                printf("read fail\r\n");
+        }
+        else
+        {
+#ifdef  __Debug_info
+            for(int i = 0;i < ret;i++)
+            {
+                    printf("0x%x ",OID_Save_Data.SUDU_Buffer[i]);
+            }
+            printf("\r\n");
+#endif
+
+            for(int i = 0;i < ret;i++)
+            {
+                if(OID_Save_Data.SUDU_Buffer[i] == 0x03 && OID_Save_Data.SUDU_Buffer[i + 1] == 0x02)
+                {
+                        OID_Save_Data.pos = i + 1;
+                        break;
+                }
+            }
+            sprintf(OID_Save_Data.buf, "%x%x",OID_Save_Data.SUDU_Buffer[ OID_Save_Data.pos + 1],OID_Save_Data.SUDU_Buffer[ OID_Save_Data.pos + 2]);
+            system("clear");
+            OID_Save_Data.Data =  hexToDec(OID_Save_Data.buf);
+            // printf("SUDU_Data: %d\r\n", OID_Save_Data.Data);
+            OID_Save_Data.n =   (float)OID_Save_Data.Data*0.00915;
+            printf("n: %f\r\n",OID_Save_Data.n);
+        }
+        usleep(100000);
+    }
+    tcsetattr(fd[pos], TCSANOW, &old_cfg);//恢复到之前的配置
+    close(fd[pos]);
+
+}
+void cb_oid_test_singal()
+{
+    int loaction = -1;
+    auto iter_order = dev_order.find("oid");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
+
+    int ret,pos = -1;
+	struct termios old_cfg={0}; //用于保存终端配置之前的参数
+	struct termios new_cfg={0}; //用于保存终端新配置的参数
+	speed_t speed = B9600;		//定义波特率为9600
+
+    /*第一步，串口初始化*/
+    for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
+    {
+        if(strcmp(it->first,dev_name[loaction]) == 0)
+        {
+            pos = it->second;
+            break;
+        }
+        else
+        {
+            printf("cb_oid_test pos_map没找到 %d\r\n",__LINE__);
         }
     }
     
@@ -1480,23 +1777,30 @@ long oid_hexToDec(char* source)
 void cb_wit_test_singal()
 {
     uart_cfg_t cfg = {0};
+    int loaction = -1;
+    auto iter_order = dev_order.find("wit");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
     //串口初始
-    wit_uart_init("/dev/ttyUSB0");
+    wit_uart_init(dev_name[loaction]);
     //设置串口参数 115200 8 1 无校验
     wit_uart_cfg(&cfg);
     int ret = 0;
     int pos = -1;
      /*第一步，串口初始化*/
+
     for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
     {
-        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        if(strcmp(it->first,dev_name[loaction]) == 0)
         {
             pos = it->second;
             break;
         }
         else
         {
-            printf("cb_brt_test pos_map没找到 %d\r\n",__LINE__);
+            printf("cb_wit_test pos_map没找到 %d\r\n",__LINE__);
         }
     }
     while(Get_isstop(pos) != true)
@@ -1644,10 +1948,17 @@ void cb_wit_test_singal()
 static int wit_uart_init(const char *device)
 {
     int pos = -1;
+    int loaction = -1;
+    auto iter_order = dev_order.find("wit");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
+
      /*第一步，串口初始化*/
     for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
     {
-        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        if(strcmp(it->first,dev_name[loaction]) == 0)
         {
             pos = it->second;
             break;
@@ -1679,12 +1990,17 @@ static int wit_uart_init(const char *device)
 //串口配置
 static int wit_uart_cfg(const uart_cfg_t *cfg)
 {
-
+    int loaction = -1;
+    auto iter_order = dev_order.find("wit");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
     int pos = -1;
      /*第一步，串口初始化*/
     for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
     {
-        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        if(strcmp(it->first,dev_name[loaction]) == 0)
         {
             pos = it->second;
             break;
@@ -1822,8 +2138,14 @@ static int wit_uart_cfg(const uart_cfg_t *cfg)
 void cb_jy9_test_singal()
 {
     uart_cfg_t cfg = {0};
+    int loaction = -1;
+    auto iter_order = dev_order.find("jy9");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
     //串口初始
-    jy9_uart_init("/dev/ttyUSB0");
+    jy9_uart_init(dev_name[loaction]);
     //设置串口参数 9600 8 1 无校验
     jy9_uart_cfg(&cfg);
     int ret = 0;
@@ -1831,7 +2153,7 @@ void cb_jy9_test_singal()
      /*第一步，串口初始化*/
     for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
     {
-        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        if(strcmp(it->first,dev_name[loaction]) == 0)
         {
             pos = it->second;
             break;
@@ -1852,7 +2174,7 @@ void cb_jy9_test_singal()
         else if (ret > 0)
         {
             
-           //原始数据
+        //原始数据
 #ifdef __Debug_info
            for (int i = 0; i < WIT_Buffer_Length; i++)
            {
@@ -1984,11 +2306,18 @@ void cb_jy9_test_singal()
 //串口初始化
 static int jy9_uart_init(const char *device)
 {
+    int loaction = -1;
+    auto iter_order = dev_order.find("jy9");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
+
     int pos = -1;
      /*第一步，串口初始化*/
     for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
     {
-        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        if(strcmp(it->first,dev_name[loaction]) == 0)
         {
             pos = it->second;
             break;
@@ -2020,12 +2349,18 @@ static int jy9_uart_init(const char *device)
 //串口配置
 static int jy9_uart_cfg(const uart_cfg_t *cfg)
 {
+    int loaction = -1;
+    auto iter_order = dev_order.find("jy9");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
 
     int pos = -1;
      /*第一步，串口初始化*/
     for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
     {
-        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        if(strcmp(it->first,dev_name[loaction]) == 0)
         {
             pos = it->second;
             break;
@@ -2163,6 +2498,13 @@ static int jy9_uart_cfg(const uart_cfg_t *cfg)
 /***********************************ATGM336H*********************************************/
 void cb_gps_test_singal()
 {
+    int loaction = -1;
+    auto iter_order = dev_order.find("atgm");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
+
     /* 清零操作 */
     bzero(GPS_Save_Data.Data,sizeof(GPS_Save_Data.Data));
     bzero(GPS_Save_Data.GNRMC,sizeof(GPS_Save_Data.GNRMC));
@@ -2199,7 +2541,7 @@ void cb_gps_test_singal()
 
     uart_cfg_t cfg = {0};
     //串口初始
-    gps_uart_init("/dev/ttyUSB0");
+    gps_uart_init(dev_name[loaction]);
     //设置串口参数 115200 8 1 无校验
     gps_uart_cfg(&cfg);
     int ret = 0;
@@ -2207,7 +2549,7 @@ void cb_gps_test_singal()
      /*第一步，串口初始化*/
     for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
     {
-        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        if(strcmp(it->first,dev_name[loaction]) == 0)
         {
             pos = it->second;
             break;
@@ -2642,11 +2984,17 @@ double Convert_to_degrees(char* data)
 //串口初始化
 static int gps_uart_init(const char *device)
 {
+    int loaction = -1;
+    auto iter_order = dev_order.find("atgm");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
     int pos = -1;
      /*第一步，串口初始化*/
     for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
     {
-        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        if(strcmp(it->first,dev_name[loaction]) == 0)
         {
             pos = it->second;
             break;
@@ -2678,12 +3026,17 @@ static int gps_uart_init(const char *device)
 //串口配置
 static int gps_uart_cfg(const uart_cfg_t *cfg)
 {
-
+    int loaction = -1;
+    auto iter_order = dev_order.find("atgm");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
     int pos = -1;
      /*第一步，串口初始化*/
     for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
     {
-        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        if(strcmp(it->first,dev_name[loaction]) == 0)
         {
             pos = it->second;
             break;
@@ -2820,6 +3173,14 @@ static int gps_uart_cfg(const uart_cfg_t *cfg)
 /***********************************WTGPS*********************************************/
 void cb_wtgps_test_singal()
 {
+    int loaction = -1;
+    auto iter_order = dev_order.find("wtgps");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
+
+
     /* 清零操作 */
     bzero(WTGPS_GPS_Save_Data.Data,sizeof(WTGPS_GPS_Save_Data.Data));
     bzero(WTGPS_GPS_Save_Data.GNRMC,sizeof(WTGPS_GPS_Save_Data.GNRMC));
@@ -2856,7 +3217,7 @@ void cb_wtgps_test_singal()
 
     uart_cfg_t cfg = {0};
     //串口初始
-    WTGPS_gps_uart_init("/dev/ttyUSB0");
+    WTGPS_gps_uart_init(dev_name[loaction]);
     //设置串口参数 115200 8 1 无校验
     WTGPS_gps_uart_cfg(&cfg);
     int ret = 0;
@@ -2864,7 +3225,7 @@ void cb_wtgps_test_singal()
      /*第一步，串口初始化*/
     for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
     {
-        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        if(strcmp(it->first,dev_name[loaction]) == 0)
         {
             pos = it->second;
             break;
@@ -3298,11 +3659,17 @@ double WTGPS_Convert_to_degrees(char* data)
 //串口初始化
 static int WTGPS_gps_uart_init(const char *device)
 {
+    int loaction = -1;
+    auto iter_order = dev_order.find("wtgps");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
     int pos = -1;
      /*第一步，串口初始化*/
     for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
     {
-        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        if(strcmp(it->first,dev_name[loaction]) == 0)
         {
             pos = it->second;
             break;
@@ -3334,12 +3701,17 @@ static int WTGPS_gps_uart_init(const char *device)
 //串口配置
 static int WTGPS_gps_uart_cfg(const uart_cfg_t *cfg)
 {
-
+    int loaction = -1;
+    auto iter_order = dev_order.find("wtgps");
+    if(iter_order != pos_map.end())
+    {
+        loaction = iter_order->second;
+    }
     int pos = -1;
      /*第一步，串口初始化*/
     for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
     {
-        if(strcmp(it->first,"/dev/ttyUSB0") == 0)
+        if(strcmp(it->first,dev_name[loaction]) == 0)
         {
             pos = it->second;
             break;
