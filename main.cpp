@@ -1972,7 +1972,7 @@ static int wit_uart_init(const char *device)
 
     /* 打开串口终端  使用的标志有 可读可写，告诉系统该节点不会成为进程的控制终端，非阻塞方式，读不到数据返回-1,*/
     fd[pos] = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
-    if (0 > fd) {
+    if (0 > fd[pos]) {
         fprintf(stderr, "open error: %s: %s\n", device, strerror(errno));
         return -1;
     }
@@ -2331,7 +2331,7 @@ static int jy9_uart_init(const char *device)
 
     /* 打开串口终端  使用的标志有 可读可写，告诉系统该节点不会成为进程的控制终端，非阻塞方式，读不到数据返回-1,*/
     fd[pos] = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
-    if (0 > fd) {
+    if (0 > fd[pos]) {
         fprintf(stderr, "open error: %s: %s\n", device, strerror(errno));
         return -1;
     }
@@ -3008,7 +3008,7 @@ static int gps_uart_init(const char *device)
 
     /* 打开串口终端  使用的标志有 可读可写，告诉系统该节点不会成为进程的控制终端，非阻塞方式，读不到数据返回-1,*/
     fd[pos] = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
-    if (0 > fd) {
+    if (0 > fd[pos]) {
         fprintf(stderr, "open error: %s: %s\n", device, strerror(errno));
         return -1;
     }
@@ -3683,7 +3683,7 @@ static int WTGPS_gps_uart_init(const char *device)
 
     /* 打开串口终端  使用的标志有 可读可写，告诉系统该节点不会成为进程的控制终端，非阻塞方式，读不到数据返回-1,*/
     fd[pos] = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
-    if (0 > fd) {
+    if (0 > fd[pos]) {
         fprintf(stderr, "open error: %s: %s\n", device, strerror(errno));
         return -1;
     }

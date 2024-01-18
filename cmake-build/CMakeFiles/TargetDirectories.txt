@@ -1,0 +1,3 @@
+/home/zjt/vscode/Develop/cmake-build/CMakeFiles/hotplug.dir
+/home/zjt/vscode/Develop/cmake-build/CMakeFiles/edit_cache.dir
+/home/zjt/vscode/Develop/cmake-build/CMakeFiles/rebuild_cache.dir

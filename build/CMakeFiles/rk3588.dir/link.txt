@@ -1,1 +1,0 @@
-aarch64-none-linux-gnu-g++   -std=c++11 -pthread   CMakeFiles/rk3588.dir/main.cpp.o CMakeFiles/rk3588.dir/HotPlug.cpp.o  -o rk3588 
