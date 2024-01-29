@@ -288,6 +288,26 @@ static int jy9_uart_init(const char *device);
 static int jy9_uart_cfg(const uart_cfg_t *cfg);
 void cb_jy9_test_singal();
 
+/*****************************视觉********************************************/
+/**************************video1*****************************************/
+//yanzheng
+unsigned char video1_send_buffer[5] = {0x56,0x00,0x36,0x01,0x00};
+unsigned char video1_buffer[5];
+bool video1_quit = true;
+
+//data
+unsigned char video1_send_buffer_1[16] = {0x56,0x00,0x32,0x0C,0x00,0x0A,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x2C,0x00,0xFF};
+
+#define video1_receive_num 310
+unsigned char video1_buffer_1[video1_receive_num];
+static struct termios video1_old_cfg;  //用于保存终端的配置参数
+
+void cb_video1_test_singal();
+int video1_uart_init(const char *device);
+int video1_uart_cfg(const uart_cfg_t *cfg);
+
+
+
 /****************************全局*********************************************/
 void observeALLDeviceHotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
 /****************************brt*********************************************/
@@ -302,8 +322,8 @@ void observe_JY9_HotPlugEventCallback(const DevType devType,const DevAction devA
 void observe_ATGM336H_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
 /****************************WTGPS*********************************************/
 void observe_WTGPS_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
-/****************************video*********************************************/
-void observe_video_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
+/****************************video1*********************************************/
+void observe_VIDEO1_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
 
 //尾插
 int arry_insert_back(const char* devpath);
@@ -340,6 +360,7 @@ int main(int argc , char * argv[])
             dev_order.insert(std::pair<const char*,int>("jy9",0));
             dev_order.insert(std::pair<const char*,int>("atgm",0));
             dev_order.insert(std::pair<const char*,int>("wtgps",0));
+            dev_order.insert(std::pair<const char*,int>("video1",0));
         }
 
         if(strcmp(argv[1],"-h") == 0)
@@ -353,6 +374,9 @@ int main(int argc , char * argv[])
             printf("*****************位置******************\r\n");
             printf("-atgm       支持_位置_传感器atgm336h热插拔\r\n");
             printf("-wtgps      支持_位置_传感器WTGPS+BD热插拔\r\n\r\n");
+            printf("*****************视觉*******************\r\n");
+            printf("-video1      支持_视觉_传感器video1热插拔\r\n\r\n");
+
             printf("***************************************\r\n");
             printf("-all        支持插入多个传感器(按一定顺序)\r\n");
 
@@ -364,7 +388,7 @@ int main(int argc , char * argv[])
             exit(-1);
             int loaction = -1;
             auto iter_order = dev_order.find("atgm");
-            if(iter_order != pos_map.end())
+            if(iter_order != dev_order.end())
             {
                 loaction = iter_order->second;
             }
@@ -421,7 +445,7 @@ int main(int argc , char * argv[])
         {
             int loaction = -1;
             auto iter_order = dev_order.find("brt");
-            if(iter_order != pos_map.end())
+            if(iter_order != dev_order.end())
             {
                 loaction = iter_order->second;
             }
@@ -449,7 +473,7 @@ int main(int argc , char * argv[])
         {
             int loaction = -1;
             auto iter_order = dev_order.find("oid");
-            if(iter_order != pos_map.end())
+            if(iter_order != dev_order.end())
             {
                 loaction = iter_order->second;
             }
@@ -472,7 +496,7 @@ int main(int argc , char * argv[])
         {
             int loaction = -1;
             auto iter_order = dev_order.find("wit");
-            if(iter_order != pos_map.end())
+            if(iter_order != dev_order.end())
             {
                 loaction = iter_order->second;
             }
@@ -495,7 +519,7 @@ int main(int argc , char * argv[])
         {
             int loaction = -1;
             auto iter_order = dev_order.find("jy9");
-            if(iter_order != pos_map.end())
+            if(iter_order != dev_order.end())
             {
                 loaction = iter_order->second;
             }
@@ -518,7 +542,7 @@ int main(int argc , char * argv[])
         {
             int loaction = -1;
             auto iter_order = dev_order.find("atgm");
-            if(iter_order != pos_map.end())
+            if(iter_order != dev_order.end())
             {
                 loaction = iter_order->second;
             }
@@ -541,7 +565,7 @@ int main(int argc , char * argv[])
         {
             int loaction = -1;
             auto iter_order = dev_order.find("wtgps");
-            if(iter_order != pos_map.end())
+            if(iter_order != dev_order.end())
             {
                 loaction = iter_order->second;
             }
@@ -560,13 +584,23 @@ int main(int argc , char * argv[])
             pause();
             exit(-1);
         }
-        else if(strcmp(argv[1],"-0") == 0)
+        else if(strcmp(argv[1],"-video1") == 0)
         {
-
+            int loaction = -1;
+            auto iter_order = dev_order.find("video1");
+            if(iter_order != dev_order.end())
+            {
+                loaction = iter_order->second;
+            }
+            // printf("loaction=%d\r\n",loaction);
+            //注册设备回调表
+            dev_map.insert(std::pair<const char*,function_type>(dev_name[loaction],cb_video1_test_singal));
+            //注册设备号相对位置表
+            pos_map.insert(std::pair<const char*,int>(dev_name[loaction],loaction));
             //初始化热插拔服务器
             initHotPlugObserver();
             //注册热插拔事件回调
-            registerObserveCallback(ObserveDeviceType_All,observe_video_HotPlugEventCallback);
+            registerObserveCallback(ObserveDeviceType_All,observe_VIDEO1_HotPlugEventCallback);
             printf("系统初始化完毕\r\n");
 
             //阻塞主线程
@@ -708,7 +742,7 @@ void observe_BRT_HotPlugEventCallback(const DevType devType,const DevAction devA
 {
     int loaction = -1;
     auto iter_order = dev_order.find("brt");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -777,7 +811,7 @@ void observe_OID_HotPlugEventCallback(const DevType devType,const DevAction devA
 
     int loaction = -1;
     auto iter_order = dev_order.find("oid");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -846,7 +880,7 @@ void observe_WIT_HotPlugEventCallback(const DevType devType,const DevAction devA
 {
     int loaction = -1;
     auto iter_order = dev_order.find("wit");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -914,7 +948,7 @@ void observe_JY9_HotPlugEventCallback(const DevType devType,const DevAction devA
 {
     int loaction = -1;
     auto iter_order = dev_order.find("jy9");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -980,7 +1014,7 @@ void observe_ATGM336H_HotPlugEventCallback(const DevType devType,const DevAction
 {
     int loaction = -1;
     auto iter_order = dev_order.find("atgm");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -1045,7 +1079,7 @@ void observe_WTGPS_HotPlugEventCallback(const DevType devType,const DevAction de
 {
     int loaction = -1;
     auto iter_order = dev_order.find("wtgps");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -1104,20 +1138,66 @@ void observe_WTGPS_HotPlugEventCallback(const DevType devType,const DevAction de
         }
     }
 }
-/*********************************video************************************************/
-void observe_video_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
+/*********************************video1************************************************/
+void observe_VIDEO1_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
 {
-    if(strcmp(devPath,"/dev/video0") == 0)
+    int loaction = -1;
+    auto iter_order = dev_order.find("video1");
+    if(iter_order != dev_order.end())
     {
-        if(devType == DevType_V4l2)
+        loaction = iter_order->second;
+    }
+
+    if(strcmp(devPath,dev_name[loaction]) == 0)
+    {
+        int pos = arry_insert_back(devPath);
+        if(pos != -1)
         {
-            if(devAction == DevAction_Add)
+            if(devType == DevType_Tty)
             {
-                printf("\r\n v4l2 插入\r\n");
-            }
-            else if(devAction == DevAction_Remove)
-            {
-                 printf("\r\nv4l2 拔出\r\n");
+                if(devAction == DevAction_Add)
+                {
+
+                    system(order_info[loaction]);
+                    auto iter = pos_map.find(dev_name[loaction]);
+                    if(iter != pos_map.end())
+                    {
+                        isstop[iter->second] = false; 
+                        auto iter2 = dev_map.find(dev_name[loaction]);
+                        if(iter2 != dev_map.end())
+                        {
+                            std::thread video1(iter2->second);
+                            video1.detach();
+                            printf("视觉传感器video1插入\r\n");
+                        }
+                        else
+                        {
+                            printf("[ADD]: video1 dev_map没找到 %d\r\n",__LINE__);
+                        }
+                    }
+                    else
+                    {
+                        printf("[ADD]:video1 pos_map没找到 %d\r\n",__LINE__);
+                    }
+                      
+                }
+                else if(devAction == DevAction_Remove)
+                {
+                    if(strcmp(devPath,dev_name[loaction]) == 0)
+                    {
+                        auto iter = pos_map.find(dev_name[loaction]);
+                        if(iter != pos_map.end())
+                        {
+                            stop_Thread(iter->second,true);  
+                            array_delete_pre(devPath);
+                            printf("视觉传感器video1拔出\r\n");
+                        }
+                        else
+                        {
+                            printf("[REMOVE]:pos_map没找到 %d\r\n",__LINE__);   
+                        }
+                    }
+                }
             }
         }
     }
@@ -1358,7 +1438,7 @@ void cb_brt_test_singal()
 
     int loaction = -1;
     auto iter_order = dev_order.find("brt");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -1623,7 +1703,7 @@ void cb_oid_test_singal()
 {
     int loaction = -1;
     auto iter_order = dev_order.find("oid");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -1779,7 +1859,7 @@ void cb_wit_test_singal()
     uart_cfg_t cfg = {0};
     int loaction = -1;
     auto iter_order = dev_order.find("wit");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -1950,7 +2030,7 @@ static int wit_uart_init(const char *device)
     int pos = -1;
     int loaction = -1;
     auto iter_order = dev_order.find("wit");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -1992,7 +2072,7 @@ static int wit_uart_cfg(const uart_cfg_t *cfg)
 {
     int loaction = -1;
     auto iter_order = dev_order.find("wit");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -2140,7 +2220,7 @@ void cb_jy9_test_singal()
     uart_cfg_t cfg = {0};
     int loaction = -1;
     auto iter_order = dev_order.find("jy9");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -2308,7 +2388,7 @@ static int jy9_uart_init(const char *device)
 {
     int loaction = -1;
     auto iter_order = dev_order.find("jy9");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -2351,7 +2431,7 @@ static int jy9_uart_cfg(const uart_cfg_t *cfg)
 {
     int loaction = -1;
     auto iter_order = dev_order.find("jy9");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -2500,7 +2580,7 @@ void cb_gps_test_singal()
 {
     int loaction = -1;
     auto iter_order = dev_order.find("atgm");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -2986,7 +3066,7 @@ static int gps_uart_init(const char *device)
 {
     int loaction = -1;
     auto iter_order = dev_order.find("atgm");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -3028,7 +3108,7 @@ static int gps_uart_cfg(const uart_cfg_t *cfg)
 {
     int loaction = -1;
     auto iter_order = dev_order.find("atgm");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -3175,7 +3255,7 @@ void cb_wtgps_test_singal()
 {
     int loaction = -1;
     auto iter_order = dev_order.find("wtgps");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -3661,7 +3741,7 @@ static int WTGPS_gps_uart_init(const char *device)
 {
     int loaction = -1;
     auto iter_order = dev_order.find("wtgps");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -3703,7 +3783,7 @@ static int WTGPS_gps_uart_cfg(const uart_cfg_t *cfg)
 {
     int loaction = -1;
     auto iter_order = dev_order.find("wtgps");
-    if(iter_order != pos_map.end())
+    if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
     }
@@ -3846,3 +3926,239 @@ static int WTGPS_gps_uart_cfg(const uart_cfg_t *cfg)
     return 0;
 }
 
+/***********************************视觉**************************************************/
+/***********************************video1*********************************************/
+
+void cb_video1_test_singal()
+{
+    uart_cfg_t cfg = {0};
+    int loaction = -1;
+    auto iter_order = dev_order.find("video1");
+    if(iter_order != dev_order.end())
+    {
+        loaction = iter_order->second;
+    }
+
+    //串口初始
+    video1_uart_init(dev_name[loaction]);
+    //设置串口参数 
+    video1_uart_cfg(&cfg);
+
+    int ret = 0;
+    bool quit = true;
+    while (quit)
+    {
+        ret = write(fd[loaction],video1_send_buffer,5);
+        if (ret == -1)
+        {
+            printf("write error\r\n");
+            exit(0);
+        }  
+        ret = read(fd[loaction],video1_buffer,5);
+        if(ret == -1)
+        {
+            printf("read error\r\n");
+            exit(0);
+        }
+        for (int i = 0; i < 5; i++)
+        {
+            printf("%#x ",video1_buffer[i]);
+        }
+        printf("\r\n");
+
+        if(video1_buffer[0] == 0x76 && video1_buffer[1] == 0x00 && video1_buffer[2] == 0x36 && video1_buffer[3] == 0x00 && video1_buffer[4] == 0x00)
+        {
+            printf("验证通过\r\n");
+            quit = false;
+        }
+        sleep(1);
+    }
+
+    while (Get_isstop(loaction) != true)
+    {
+        ret = write(fd[loaction],video1_send_buffer_1,16);
+        if (ret == -1)
+        {
+            printf("write error\r\n");
+            exit(0);
+        }   
+        memset(video1_buffer_1,0,video1_receive_num);
+        ret = read(fd[loaction],video1_buffer_1,video1_receive_num);
+        if(ret == -1)
+        {
+            printf("read error\r\n");
+            exit(0);
+        }
+
+        if(video1_buffer_1[video1_receive_num - 5] == 0x76 && video1_buffer_1[video1_receive_num - 4] == 0x00 && video1_buffer_1[video1_receive_num - 3] == 0x32 && video1_buffer_1[video1_receive_num - 2] == 0x00 && video1_buffer_1[video1_receive_num - 1] == 0x00)
+        {
+            for (int i = 0; i < video1_receive_num; i++)
+            {
+                printf("%#x ",video1_buffer_1[i]);
+            }
+        }
+
+        usleep(100000);
+    }
+    close(fd[loaction]);
+}
+
+int video1_uart_init(const char *device)
+{
+    int loaction = -1;
+    auto iter_order = dev_order.find("video1");
+    if(iter_order != dev_order.end())
+    {
+        loaction = iter_order->second;
+    }
+    
+    /* 打开串口终端  使用的标志有 可读可写，告诉系统该节点不会成为进程的控制终端，非阻塞方式，读不到数据返回-1,*/
+    fd[loaction] = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    if (0 > fd[loaction]) {
+        fprintf(stderr, "open error: %s: %s\n", device, strerror(errno));
+        return -1;
+    }
+
+    /* 获取串口当前的配置参数 */
+    if (0 > tcgetattr(fd[loaction], &video1_old_cfg)) 
+    {
+        fprintf(stderr, "tcgetattr error: %s\n", strerror(errno));
+        close(fd[loaction]);
+        return -1;
+    }
+
+    return 0;
+}
+//串口配置
+int video1_uart_cfg(const uart_cfg_t *cfg)
+{
+    int loaction = -1;
+    auto iter_order = dev_order.find("video1");
+    if(iter_order != dev_order.end())
+    {
+        loaction = iter_order->second;
+    }
+
+    struct termios new_cfg = {0};   //将new_cfg对象清零
+    speed_t speed;
+
+    /* 设置为原始模式 */
+    cfmakeraw(&new_cfg);
+
+    /* 使能接收 */
+    new_cfg.c_cflag |= CREAD;
+
+    /* 设置波特率 */
+    switch (cfg->baudrate) {
+        case 1200: speed = B1200;
+            break;
+        case 1800: speed = B1800;
+            break;
+        case 2400: speed = B2400;
+            break;
+        case 4800: speed = B4800;
+            break;
+        case 9600: speed = B9600;
+            break;
+        case 19200: speed = B19200;
+            break;
+        case 38400: speed = B38400;
+            break;
+        case 57600: speed = B57600;
+            break;
+        case 115200: speed = B115200;
+            break;
+        case 230400: speed = B230400;
+            break;
+        case 460800: speed = B460800;
+            break;
+        case 500000: speed = B500000;
+            break;
+        default:    //默认配置为115200
+            speed = B38400;
+            // printf("default baud rate: 9600\n");
+            break;
+    }
+
+    if (0 > cfsetspeed(&new_cfg, speed)) 
+    {
+        fprintf(stderr, "cfsetspeed error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    /* 设置数据位大小 */
+    new_cfg.c_cflag &= ~CSIZE;  //将数据位相关的比特位清零
+    switch (cfg->dbit) {
+        case 5:
+            new_cfg.c_cflag |= CS5;
+            break;
+        case 6:
+            new_cfg.c_cflag |= CS6;
+            break;
+        case 7:
+            new_cfg.c_cflag |= CS7;
+            break;
+        case 8:
+            new_cfg.c_cflag |= CS8;
+            break;
+        default:    //默认数据位大小为8
+            new_cfg.c_cflag |= CS8;
+            // printf("default data bit size: 8\n");
+            break;
+    }
+
+    /* 设置奇偶校验 */
+    switch (cfg->parity) {
+        case 'N':       //无校验
+            new_cfg.c_cflag &= ~PARENB;
+            new_cfg.c_iflag &= ~INPCK;
+            break;
+        case 'O':       //奇校验
+            new_cfg.c_cflag |= (PARODD | PARENB);
+            new_cfg.c_iflag |= INPCK;
+            break;
+        case 'E':       //偶校验
+            new_cfg.c_cflag |= PARENB;
+            new_cfg.c_cflag &= ~PARODD; /* 清除PARODD标志，配置为偶校验 */
+            new_cfg.c_iflag |= INPCK;
+            break;
+        default:    //默认配置为无校验
+            new_cfg.c_cflag &= ~PARENB;
+            new_cfg.c_iflag &= ~INPCK;
+            // printf("default parity: N\n");
+            break;
+    }
+
+    /* 设置停止位 */
+    switch (cfg->sbit) {
+        case 1:     //1个停止位
+            new_cfg.c_cflag &= ~CSTOPB;
+            break;
+        case 2:     //2个停止位
+            new_cfg.c_cflag |= CSTOPB;
+            break;
+        default:    //默认配置为1个停止位
+            new_cfg.c_cflag &= ~CSTOPB;
+            // printf("default stop bit size: 1\n");
+            break;
+    }
+
+    /* 将MIN和TIME设置为0 */
+    new_cfg.c_cc[VTIME] = 0;
+    new_cfg.c_cc[VMIN] = 0;
+
+    /* 清空缓冲区 */
+    if (0 > tcflush(fd[loaction], TCIOFLUSH)) {
+        fprintf(stderr, "tcflush error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    /* 写入配置、使配置生效 */
+    if (0 > tcsetattr(fd[loaction], TCSANOW, &new_cfg)) {
+        fprintf(stderr, "tcsetattr error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    /* 配置OK 退出 */
+    return 0;
+}
