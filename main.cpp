@@ -66,12 +66,13 @@ typedef struct uart_hardware_cfg {
 #define brt_Buffer_Length 60
 typedef struct BRT_SaveData
 {
-    char SUDU_Buffer[brt_Buffer_Length];
+    unsigned char SUDU_Buffer[brt_Buffer_Length];
     char order[8]; 
     char buf[5] = { 0 };
     int Data;
     int  pos = 0;
     float n = 0;  //转速
+    int isfind = -1;
 } BRT_SaveData;
 BRT_SaveData Brt_Save_Data;
 int getIndexOfSigns(char ch);
@@ -290,15 +291,18 @@ void cb_jy9_test_singal();
 
 /*****************************视觉********************************************/
 /**************************video1*****************************************/
+unsigned char video1_send_reset_buffer[4] = {0x56,0x00,0x26,0x00};
+
 //验证
 unsigned char video1_send_buffer[5] = {0x56,0x00,0x36,0x01,0x00};
-unsigned char video1_buffer[5];
-bool video1_quit = true;
+unsigned char video1_send_buffer_leng[5] = {0x56,0x00,0x34,0x01,0x00};
+unsigned char video1_send_buffer_hifu[5] = {0x56,0x00,0x36,0x01,0x02};
+
 
 //数据
-unsigned char video1_send_buffer_1[16] = {0x56,0x00,0x32,0x0C,0x00,0x0A,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x2C,0x00,0xFF};
+unsigned char video1_send_buffer_1[16] = {0x56,0x00,0x32,0x0C,0x00,0x0A,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xc8,0x00,0xFF};
 
-#define video1_receive_num 310
+#define video1_receive_num 230
 unsigned char video1_buffer_1[video1_receive_num];
 static struct termios video1_old_cfg;  //用于保存终端的配置参数
 
@@ -333,7 +337,7 @@ void observe_ATGM336H_HotPlugEventCallback(const DevType devType,const DevAction
 void observe_WTGPS_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
 /****************************video1*********************************************/
 void observe_VIDEO1_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
-/*********************************radar1************************************************/
+/*********************************msl53l1m************************************************/
 void observe_SADAR1_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
 
 //尾插
@@ -344,7 +348,6 @@ void array_delete_pre(const char* devpath);
 bool Get_isstop(int pos);
 //停止
 void stop_Thread(int pos , bool states);
-
 
 int main(int argc , char * argv[])
 {
@@ -372,7 +375,7 @@ int main(int argc , char * argv[])
             dev_order.insert(std::pair<const char*,int>("atgm",0));
             dev_order.insert(std::pair<const char*,int>("wtgps",0));
             dev_order.insert(std::pair<const char*,int>("video1",0));
-            dev_order.insert(std::pair<const char*,int>("radar1",0));
+            dev_order.insert(std::pair<const char*,int>("msl53l1m",0));
         }
 
         if(strcmp(argv[1],"-h") == 0)
@@ -389,7 +392,7 @@ int main(int argc , char * argv[])
             printf("*****************视觉*******************\r\n");
             printf("-video1      支持_视觉_传感器video1热插拔\r\n\r\n");
             printf("*****************测距*******************\r\n");
-            printf("-radar1      支持_测距_传感器Sadar1热插拔\r\n\r\n");
+            printf("-msl53l1m      支持_测距_传感器Msl53l1m热插拔\r\n\r\n");
 
             printf("***************************************\r\n");
             printf("-all        支持插入多个传感器(按一定顺序)\r\n");
@@ -469,10 +472,6 @@ int main(int argc , char * argv[])
             //注册设备号相对位置表
             pos_map.insert(std::pair<const char*,int>(dev_name[loaction],loaction));
 
-            // for(map<const char*,function_type>::iterator it=dev_map.begin();it!=dev_map.end();it++)
-            // {
-            //     cout <<"[dev_map]: " << "key:" <<it->first<<" value:"<<it->second<<endl;
-            // }
             //初始化热插拔服务器
             initHotPlugObserver();
             //注册热插拔事件回调
@@ -621,10 +620,10 @@ int main(int argc , char * argv[])
             pause();
             exit(-1);
         }
-        else if(strcmp(argv[1],"-radar1") == 0)
+        else if(strcmp(argv[1],"-msl53l1m") == 0)
         {
             int loaction = -1;
-            auto iter_order = dev_order.find("radar1");
+            auto iter_order = dev_order.find("msl53l1m");
             if(iter_order != dev_order.end())
             {
                 loaction = iter_order->second;
@@ -1239,11 +1238,11 @@ void observe_VIDEO1_HotPlugEventCallback(const DevType devType,const DevAction d
         }
     }
 }
-/*********************************radar1************************************************/
+/*********************************msl53l1m************************************************/
 void observe_SADAR1_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
 {
     int loaction = -1;
-    auto iter_order = dev_order.find("radar1");
+    auto iter_order = dev_order.find("msl53l1m");
     if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
@@ -1267,8 +1266,8 @@ void observe_SADAR1_HotPlugEventCallback(const DevType devType,const DevAction d
                         auto iter2 = dev_map.find(dev_name[loaction]);
                         if(iter2 != dev_map.end())
                         {
-                            std::thread radar1(iter2->second);
-                            radar1.detach();
+                            std::thread msl53l1m(iter2->second);
+                            msl53l1m.detach();
                             printf("测距传感器SaDar1插入\r\n");
                         }
                         else
@@ -1556,8 +1555,11 @@ void cb_brt_test_singal()
             printf("cb_brt_test pos_map没找到 %d\r\n",__LINE__);
         }
     }
-    // printf("pos=%d\r\n ",pos);
-    // cout << "port[pos]=" << port[pos] << endl;
+#ifdef __Debug_info
+    printf("pos=%d\r\n ",pos);
+    cout << "port[pos]=" << port[pos] << endl;
+#endif
+
 	fd[pos] = open(port[pos].c_str(),O_RDWR | O_NOCTTY | O_NDELAY);//O_NOCTTY 标志，告知系统该节点不会成为进程的控制终端
     if(fd[pos] < 0)
     {
@@ -1603,17 +1605,18 @@ void cb_brt_test_singal()
         Brt_Save_Data.order[5] = 0x02;
         Brt_Save_Data.order[6] = 0xC5;
         Brt_Save_Data.order[7] = 0xC1;
-	
+
         while(Get_isstop(pos) != true)
         { 
-            int ret = write(fd[pos],Brt_Save_Data.order,8);
-            if(ret < 0)
-            {
-                printf("write fail %d\r\n",__LINE__);
-                sleep(1);
-            }
-            else
-            {
+
+            // ret = write(fd[pos],Brt_Save_Data.order,8);
+            // if(ret < 0)
+            // {
+            //     printf("write fail %d\r\n",__LINE__);
+            //     sleep(1);
+            // }
+            // else
+            // {
                 // printf("write data: %d\r\n",ret);
                 bzero(Brt_Save_Data.SUDU_Buffer,sizeof(Brt_Save_Data.SUDU_Buffer));
                 ret = read(fd[pos],Brt_Save_Data.SUDU_Buffer,10);
@@ -1627,28 +1630,51 @@ void cb_brt_test_singal()
 #ifdef  __Debug_info
                     for(int i = 0;i < ret;i++)
                     {
+                        printf("%d ",Brt_Save_Data.SUDU_Buffer[i]);
+                    }
+                    printf("\r\n");
+                    for(int i = 0;i < ret;i++)
+                    {
                         printf("0x%x ",Brt_Save_Data.SUDU_Buffer[i]);
                     }
                     printf("\r\n");
 #endif
-
+                
                     for(int i = 0;i < ret;i++)
                     {
                         if(Brt_Save_Data.SUDU_Buffer[i] == 0x03 && Brt_Save_Data.SUDU_Buffer[i + 1] == 0x04)
                         {
                             Brt_Save_Data.pos = i + 1;
+                            Brt_Save_Data.isfind = 1;//标识找到了
                             break;
                         }
                     }
-                    sprintf(Brt_Save_Data.buf, "%x%x%x%x",Brt_Save_Data.SUDU_Buffer[ Brt_Save_Data.pos + 1],Brt_Save_Data.SUDU_Buffer[ Brt_Save_Data.pos + 2],Brt_Save_Data.SUDU_Buffer[ Brt_Save_Data.pos +3],Brt_Save_Data.SUDU_Buffer[ Brt_Save_Data.pos + 4]);
-                    system("clear");
-                    Brt_Save_Data.Data =  hexToDec(Brt_Save_Data.buf);
-                    // printf("SUDU_Data: %d\t", Brt_Save_Data.Data);
-                    Brt_Save_Data.n =   (float)Brt_Save_Data.Data*0.00915;
-                    printf("n: %f\r\n",Brt_Save_Data.n);
+                    if(Brt_Save_Data.isfind == 1)//找到了
+                    {
+#ifdef  __Debug_info
+
+                        printf("找到了\r\n");
+#endif        
+
+                        Brt_Save_Data.isfind == -1;
+                        sprintf(Brt_Save_Data.buf, "%x%x%x%x",Brt_Save_Data.SUDU_Buffer[ Brt_Save_Data.pos + 1],Brt_Save_Data.SUDU_Buffer[ Brt_Save_Data.pos + 2],Brt_Save_Data.SUDU_Buffer[ Brt_Save_Data.pos +3],Brt_Save_Data.SUDU_Buffer[ Brt_Save_Data.pos + 4]);
+#ifdef  __Debug_info
+                        printf("%s ",Brt_Save_Data.buf);
+                        printf("\r\n");
+#endif        
+                        system("clear");
+                        Brt_Save_Data.Data =  hexToDec(Brt_Save_Data.buf);
+
+#ifdef  __Debug_info
+                        printf("SUDU_Data: %d\t", Brt_Save_Data.Data);
+#endif        
+                        Brt_Save_Data.n =   (float)Brt_Save_Data.Data*0.00915;
+
+                        printf("n: %f\r\n",Brt_Save_Data.n);
+                    }
                 }
                 usleep(100000);                  
-            }
+            // }
         }
         tcsetattr(fd[pos], TCSANOW, &old_cfg);//恢复到之前的配置
         close(fd[pos]);
@@ -1791,7 +1817,7 @@ void cb_oid_test()
             system("clear");
             OID_Save_Data.Data =  hexToDec(OID_Save_Data.buf);
             // printf("SUDU_Data: %d\r\n", OID_Save_Data.Data);
-            OID_Save_Data.n =   (float)OID_Save_Data.Data*0.00915;
+            OID_Save_Data.n =   (float)OID_Save_Data.Data*0.000305;
             printf("n: %f\r\n",OID_Save_Data.n);
         }
         usleep(100000);
@@ -4047,42 +4073,31 @@ void cb_video1_test_singal()
 
     int ret = 0;
     bool quit = true;
-    while (quit)
+    while (Get_isstop(loaction) != true)
     {
+    
         ret = write(fd[loaction],video1_send_buffer,5);
         if (ret == -1)
         {
             printf("write error\r\n");
-            exit(0);
-        }  
-        ret = read(fd[loaction],video1_buffer,5);
-        if(ret == -1)
-        {
-            printf("read error\r\n");
-            exit(0);
-        }
-        for (int i = 0; i < 5; i++)
-        {
-            printf("%#x ",video1_buffer[i]);
-        }
-        printf("\r\n");
+            continue;
+        }          
+        
+        // ret = write(fd[loaction],video1_send_buffer_leng,5);
+        // if (ret == -1)
+        // {
+        //     printf("write error\r\n");
+        //     exit(0);
+        // }      
 
-        if(video1_buffer[0] == 0x76 && video1_buffer[1] == 0x00 && video1_buffer[2] == 0x36 && video1_buffer[3] == 0x00 && video1_buffer[4] == 0x00)
-        {
-            printf("验证通过\r\n");
-            quit = false;
-        }
         sleep(1);
-    }
-
-    while (Get_isstop(loaction) != true)
-    {
         ret = write(fd[loaction],video1_send_buffer_1,16);
         if (ret == -1)
         {
-            printf("write error\r\n");
-            exit(0);
-        }   
+            // printf("write error\r\n");
+            continue;
+        }      
+
         memset(video1_buffer_1,0,video1_receive_num);
         ret = read(fd[loaction],video1_buffer_1,video1_receive_num);
         if(ret == -1)
@@ -4090,16 +4105,21 @@ void cb_video1_test_singal()
             printf("read error\r\n");
             exit(0);
         }
-
-        if(video1_buffer_1[video1_receive_num - 5] == 0x76 && video1_buffer_1[video1_receive_num - 4] == 0x00 && video1_buffer_1[video1_receive_num - 3] == 0x32 && video1_buffer_1[video1_receive_num - 2] == 0x00 && video1_buffer_1[video1_receive_num - 1] == 0x00)
+        for (int i = 0; i < video1_receive_num; i++)
         {
-            for (int i = 0; i < video1_receive_num; i++)
-            {
-                printf("%#x ",video1_buffer_1[i]);
-            }
+            printf("%#x ",video1_buffer_1[i]);
         }
+        printf("\r\n");
 
-        usleep(100000);
+
+        
+        ret = write(fd[loaction],video1_send_buffer_hifu,5);
+        if (ret == -1)
+        {
+            printf("write error\r\n");
+            continue;
+        }   
+        
     }
     close(fd[loaction]);
 }
@@ -4265,14 +4285,14 @@ int video1_uart_cfg(const uart_cfg_t *cfg)
 }
 
 /***********************************测距**************************************************/
-/***********************************Sadar1**************************************************/
+/***********************************msl53l1m**************************************************/
 void cb_SaDar1_test_singal()
 {
 
     uart_cfg_t cfg = {0};
 
     int loaction = -1;
-    auto iter_order = dev_order.find("radar1");
+    auto iter_order = dev_order.find("msl53l1m");
     if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
@@ -4297,7 +4317,7 @@ void cb_SaDar1_test_singal()
 int Sadar1_uart_init(const char *device)
 {
     int loaction = -1;
-    auto iter_order = dev_order.find("radar1");
+    auto iter_order = dev_order.find("msl53l1m");
     if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
@@ -4324,7 +4344,7 @@ int Sadar1_uart_init(const char *device)
 int SaDar1_uart_cfg(const uart_cfg_t *cfg)
 {
     int loaction = -1;
-    auto iter_order = dev_order.find("radar1");
+    auto iter_order = dev_order.find("msl53l1m");
     if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;

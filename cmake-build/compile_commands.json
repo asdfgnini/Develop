@@ -1,12 +1,12 @@
 [
 {
   "directory": "/home/zjt/vscode/Develop/cmake-build",
-  "command": "/usr/bin/g++   -g -o CMakeFiles/hotplug.dir/main.cpp.o -c /home/zjt/vscode/Develop/main.cpp",
+  "command": "/usr/bin/g++    -std=c++11 -pthread -g -o CMakeFiles/hotplug.dir/main.cpp.o -c /home/zjt/vscode/Develop/main.cpp",
   "file": "/home/zjt/vscode/Develop/main.cpp"
 },
 {
   "directory": "/home/zjt/vscode/Develop/cmake-build",
-  "command": "/usr/bin/g++   -g -o CMakeFiles/hotplug.dir/HotPlug.cpp.o -c /home/zjt/vscode/Develop/HotPlug.cpp",
+  "command": "/usr/bin/g++    -std=c++11 -pthread -g -o CMakeFiles/hotplug.dir/HotPlug.cpp.o -c /home/zjt/vscode/Develop/HotPlug.cpp",
   "file": "/home/zjt/vscode/Develop/HotPlug.cpp"
 }
 ]
