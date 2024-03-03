@@ -310,16 +310,45 @@ void cb_video1_test_singal();
 int video1_uart_init(const char *device);
 int video1_uart_cfg(const uart_cfg_t *cfg);
 
+/**************************video2*****************************************/
+// unsigned char video2_send_reset_buffer[4] = {0x56,0x00,0x26,0x00};
+
+//验证
+unsigned char video2_send_buffer[5] = {0x56,0x00,0x36,0x01,0x00};
+unsigned char video2_send_buffer_leng[5] = {0x56,0x00,0x34,0x01,0x00};
+unsigned char video2_send_buffer_hifu[5] = {0x56,0x00,0x36,0x01,0x03};
+
+
+//数据
+unsigned char video2_send_buffer_1[16] = {0x56,0x00,0x32,0x0C,0x00,0x0A,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xc8,0x00,0xFF};
+
+#define video2_receive_num 230
+unsigned char video2_buffer_1[video2_receive_num];
+static struct termios video2_old_cfg;  //用于保存终端的配置参数
+
+void cb_video2_test_singal();
+int video2_uart_init(const char *device);
+int video2_uart_cfg(const uart_cfg_t *cfg);
+
 
 /*****************************测距********************************************/
 /**************************Sadar1*****************************************/
 
-int Sadar1_uart_init(const char *device);
+int SaDar1_uart_init(const char *device);
 int SaDar1_uart_cfg(const uart_cfg_t *cfg);
 
 void cb_SaDar1_test_singal();
 
 unsigned char SaDar1_buffer[50];
+
+/**************************VL53*****************************************/
+
+int VL53_uart_init(const char *device);
+int VL53_uart_cfg(const uart_cfg_t *cfg);
+
+void cb_VL53_test_singal();
+
+unsigned char VL53_buffer[50];
 
 /****************************全局*********************************************/
 void observeALLDeviceHotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
@@ -337,8 +366,12 @@ void observe_ATGM336H_HotPlugEventCallback(const DevType devType,const DevAction
 void observe_WTGPS_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
 /****************************video1*********************************************/
 void observe_VIDEO1_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
+/****************************video2*********************************************/
+void observe_VIDEO2_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
 /*********************************msl53l1m************************************************/
 void observe_SADAR1_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
+/*********************************VL53************************************************/
+void observe_VL53_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath);
 
 //尾插
 int arry_insert_back(const char* devpath);
@@ -370,12 +403,18 @@ int main(int argc , char * argv[])
         {
             dev_order.insert(std::pair<const char*,int>("brt",0));
             dev_order.insert(std::pair<const char*,int>("oid",0));
+
             dev_order.insert(std::pair<const char*,int>("wit",0));
             dev_order.insert(std::pair<const char*,int>("jy9",0));
+
             dev_order.insert(std::pair<const char*,int>("atgm",0));
             dev_order.insert(std::pair<const char*,int>("wtgps",0));
+
             dev_order.insert(std::pair<const char*,int>("video1",0));
+            dev_order.insert(std::pair<const char*,int>("video2",0));
+
             dev_order.insert(std::pair<const char*,int>("msl53l1m",0));
+            dev_order.insert(std::pair<const char*,int>("vl53",0));
         }
 
         if(strcmp(argv[1],"-h") == 0)
@@ -390,12 +429,14 @@ int main(int argc , char * argv[])
             printf("-atgm       支持_位置_传感器atgm336h热插拔\r\n");
             printf("-wtgps      支持_位置_传感器WTGPS+BD热插拔\r\n\r\n");
             printf("*****************视觉*******************\r\n");
-            printf("-video1      支持_视觉_传感器video1热插拔\r\n\r\n");
+            printf("-video1      支持_视觉_传感器video1热插拔\r\n");
+            printf("-video2led      支持_视觉_传感器video2热插拔\r\n\r\n");
             printf("*****************测距*******************\r\n");
-            printf("-msl53l1m      支持_测距_传感器Msl53l1m热插拔\r\n\r\n");
+            printf("-msl53l1m    支持_测距_传感器Msl53l1m热插拔\r\n");
+            printf("-vl53        支持_测距_传感器VL53热插拔\r\n\r\n");
 
-            printf("***************************************\r\n");
-            printf("-all        支持插入多个传感器(按一定顺序)\r\n");
+            // printf("***************************************\r\n");
+            // printf("-all        支持插入多个传感器(按一定顺序)\r\n");
 
             exit(-1);
         }
@@ -404,34 +445,44 @@ int main(int argc , char * argv[])
             printf("\r\n暂未开发, 敬请期待!!!\r\n");
             exit(-1);
             int loaction = -1;
-            auto iter_order = dev_order.find("atgm");
+            auto iter_order = dev_order.find("brt");
             if(iter_order != dev_order.end())
             {
                 loaction = iter_order->second;
             }
             //注册设备回调表
-            dev_map.insert(std::pair<const char*,function_type>("/dev/ttyUSB0",cb_brt_test));
-            dev_map.insert(std::pair<const char*,function_type>("/dev/ttyUSB1",cb_oid_test));
+            dev_map.insert(std::pair<const char*,function_type>(dev_name[loaction],cb_brt_test_singal));
+            //注册设备号相对位置表
+            pos_map.insert(std::pair<const char*,int>(dev_name[loaction],loaction));      
+        
+
+            iter_order = dev_order.find("oid");
+            if(iter_order != dev_order.end())
+            {
+                loaction = iter_order->second;
+            }
+            //注册设备回调表
+            dev_map.insert(std::pair<const char*,function_type>(dev_name[loaction],cb_oid_test_singal));
+            //注册设备号相对位置表
+            pos_map.insert(std::pair<const char*,int>(dev_name[loaction],loaction));      
+        
+
+            iter_order = dev_order.find("wit");
+            if(iter_order != dev_order.end())
+            {
+                loaction = iter_order->second;
+            }
+            //注册设备回调表
+            dev_map.insert(std::pair<const char*,function_type>(dev_name[loaction],cb_wit_test_singal));
+            //注册设备号相对位置表
+            pos_map.insert(std::pair<const char*,int>(dev_name[loaction],loaction));      
            
 #ifdef __Debug_info 
-            //注册设备号相对位置表
-            pos_map.insert(std::pair<const char*,int>("/dev/ttyUSB0",0));
-            //初始化热插拔服务器
-            initHotPlugObserver();
-            //注册热插拔事件回调
-            registerObserveCallback(ObserveDeviceType_All,observe_BRT_HotPlugEventCallback);
-            printf("系统初始化完毕\r\n");
-
-
             for(map<const char*,function_type>::iterator it=dev_map.begin();it!=dev_map.end();it++)
             {
                 cout <<"[dev_map]: " << "key:" <<it->first<<" value:"<<it->second<<endl;
             }
 #endif 
-            //注册设备号相对位置表
-            pos_map.insert(std::pair<const char*,int>("/dev/ttyUSB0",0));
-            pos_map.insert(std::pair<const char*,int>("/dev/ttyUSB1",1));
-
 
 #ifdef __Debug_info
             for(map<const char*,int>::iterator it=pos_map.begin();it!=pos_map.end();it++)
@@ -620,6 +671,29 @@ int main(int argc , char * argv[])
             pause();
             exit(-1);
         }
+        else if(strcmp(argv[1],"-video2led") == 0)
+        {
+            int loaction = -1;
+            auto iter_order = dev_order.find("video2");
+            if(iter_order != dev_order.end())
+            {
+                loaction = iter_order->second;
+            }
+            // printf("loaction=%d\r\n",loaction);
+            //注册设备回调表
+            dev_map.insert(std::pair<const char*,function_type>(dev_name[loaction],cb_video2_test_singal));
+            //注册设备号相对位置表
+            pos_map.insert(std::pair<const char*,int>(dev_name[loaction],loaction));
+            //初始化热插拔服务器
+            initHotPlugObserver();
+            //注册热插拔事件回调
+            registerObserveCallback(ObserveDeviceType_All,observe_VIDEO2_HotPlugEventCallback);
+            printf("系统初始化完毕\r\n");
+
+            //阻塞主线程
+            pause();
+            exit(-1);
+        }
         else if(strcmp(argv[1],"-msl53l1m") == 0)
         {
             int loaction = -1;
@@ -643,6 +717,29 @@ int main(int argc , char * argv[])
             pause();
             exit(-1);
         }
+        else if(strcmp(argv[1],"-vl53") == 0)
+        {
+            int loaction = -1;
+            auto iter_order = dev_order.find("vl53");
+            if(iter_order != dev_order.end())
+            {
+                loaction = iter_order->second;
+            }
+            // printf("loaction=%d\r\n",loaction);
+            //注册设备回调表
+            dev_map.insert(std::pair<const char*,function_type>(dev_name[loaction],cb_VL53_test_singal));
+            //注册设备号相对位置表
+            pos_map.insert(std::pair<const char*,int>(dev_name[loaction],loaction));
+            //初始化热插拔服务器
+            initHotPlugObserver();
+            //注册热插拔事件回调
+            registerObserveCallback(ObserveDeviceType_All,observe_VL53_HotPlugEventCallback);
+            printf("系统初始化完毕\r\n");
+
+            //阻塞主线程
+            pause();
+            exit(-1);
+        }
         else
         {
             printf("\r\n请输入正确的参数!!! -h获取可用参数\r\n\r\n");    
@@ -660,117 +757,29 @@ int main(int argc , char * argv[])
 /*********************************全局************************************************/
 void observeALLDeviceHotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
 {
-    // printf(" observeBlockDeviceHotPlugEventCallback devType=%d devAction=%d devPath=%s ",devType,devAction,devPath);
+    printf(" observeBlockDeviceHotPlugEventCallback devType=%d devAction=%d devPath=%s ",devType,devAction,devPath);
     
-    int pos = arry_insert_back(devPath);
-    printf("\r\npos = %d\r\n",pos);
 
-    if(pos != -1)
+    auto iter_order = dev_map.find(devPath);
+    if(iter_order != dev_map.end())
     {
         if(devType == DevType_Tty)
         {
             if(devAction == DevAction_Add)
-            {
-                if(strcmp(devPath,"/dev/ttyUSB0") == 0)
-                {
-
-                    auto iter = pos_map.find("/dev/ttyUSB0");
-                    if(iter != pos_map.end())
-                    {
-                        isstop[iter->second] = false; 
-                        auto iter2 = dev_map.find("/dev/ttyUSB0");
-                        if(iter2 != dev_map.end())
-                        {
-                            std::thread hyxw(iter2->second);
-                            hyxw.detach();
-                            printf("力矩传感器hyxw-x6插入\r\n");
-                        }
-                        else
-                        {
-                            printf("[ADD]: hyxw dev_map没找到 %d\r\n",__LINE__);
-                        }
-                    }
-                    else
-                    {
-                        printf("[ADD]:hyxw pos_map没找到 %d\r\n",__LINE__);
-                    }
-                }  
-                else if(strcmp(devPath,"/dev/ttyUSB1") == 0)
-                {
-                    auto iter = pos_map.find("/dev/ttyUSB1");
-                    if(iter != pos_map.end())
-                    {
-                        isstop[iter->second] = false; 
-                        auto iter2 = dev_map.find("/dev/ttyUSB1");
-                        if(iter2 != dev_map.end())
-                        {
-                            std::thread brt(iter2->second);
-                            brt.detach();
-                            printf("速度传感器brt插入\r\n");
-                        }
-                        else
-                        {
-                            printf("[ADD]: brt dev_map没找到 %d\r\n",__LINE__);
-                        }
-                    }
-                    else
-                    {
-                        printf("[ADD]:brt pos_map没找到 %d\r\n",__LINE__);
-                    }
-                }  
+            {   
+                std::thread brt(iter_order->second);
+                brt.detach();
+                printf("传感器插入\r\n");
             }
             else if(devAction == DevAction_Remove)
             {
-                if(strcmp(devPath,"/dev/ttyUSB0") == 0)
-                {
-                    auto iter = pos_map.find("/dev/ttyUSB0");
-                    if(iter != pos_map.end())
-                    {
-                        isstop[iter->second] = true;   
-                        
-                        array_delete_pre(devPath);
-                        printf("力矩传感器 hyxw-x6拔出\r\n");
-                    }
-                    else
-                    {
-                        printf("[REMOVE]:pos_map没找到 %d\r\n",__LINE__);   
-                    }
-                }
-                else if(strcmp(devPath,"/dev/ttyUSB1") == 0)
-                {
-                    if(strcmp(devPath,"/dev/ttyUSB1") == 0)
-                    {
-                        auto iter = pos_map.find("/dev/ttyUSB1");
-                        if(iter != pos_map.end())
-                        {
-                            isstop[iter->second] = true;   
-                           
-                            array_delete_pre(devPath);
-                            printf("速度传感器 brt拔出\r\n");
-                        }
-                        else
-                        {
-                            printf("[REMOVE]:pos_map没找到 %d\r\n",__LINE__);   
-                        }
-                    }
-                } 
+
             }
         }
-        // //获取设备数
-        // int num1 = 0;
-        // for (int i = 0; i < dev_num; i++)
-        // {       
-        //     if(port[i] == "")
-        //     {
-        //         continue;
-        //     }
-        //     else
-        //     {
-        //         num1++;
-        //         cout << "dev: " << port[i] << endl;
-        //     }
-        // }
-        // printf("\r\n设备数:%d\r\n",num1);
+    }
+    else
+    {
+        printf("[ADD]:dev_map没找到 %d\r\n",__LINE__);
     }
 }
 /*********************************brt************************************************/
@@ -1238,6 +1247,70 @@ void observe_VIDEO1_HotPlugEventCallback(const DevType devType,const DevAction d
         }
     }
 }
+/*********************************video2************************************************/
+void observe_VIDEO2_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
+{
+    int loaction = -1;
+    auto iter_order = dev_order.find("video2");
+    if(iter_order != dev_order.end())
+    {
+        loaction = iter_order->second;
+    }
+
+    if(strcmp(devPath,dev_name[loaction]) == 0)
+    {
+        int pos = arry_insert_back(devPath);
+        if(pos != -1)
+        {
+            if(devType == DevType_Tty)
+            {
+                if(devAction == DevAction_Add)
+                {
+
+                    system(order_info[loaction]);
+                    auto iter = pos_map.find(dev_name[loaction]);
+                    if(iter != pos_map.end())
+                    {
+                        isstop[iter->second] = false; 
+                        auto iter2 = dev_map.find(dev_name[loaction]);
+                        if(iter2 != dev_map.end())
+                        {
+                            std::thread video2(iter2->second);
+                            video2.detach();
+                            printf("视觉传感器video2插入\r\n");
+                        }
+                        else
+                        {
+                            printf("[ADD]: video2 dev_map没找到 %d\r\n",__LINE__);
+                        }
+                    }
+                    else
+                    {
+                        printf("[ADD]:video2 pos_map没找到 %d\r\n",__LINE__);
+                    }
+                      
+                }
+                else if(devAction == DevAction_Remove)
+                {
+                    if(strcmp(devPath,dev_name[loaction]) == 0)
+                    {
+                        auto iter = pos_map.find(dev_name[loaction]);
+                        if(iter != pos_map.end())
+                        {
+                            stop_Thread(iter->second,true);  
+                            array_delete_pre(devPath);
+                            printf("视觉传感器video2拔出\r\n");
+                        }
+                        else
+                        {
+                            printf("[REMOVE]:pos_map没找到 %d\r\n",__LINE__);   
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 /*********************************msl53l1m************************************************/
 void observe_SADAR1_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
 {
@@ -1272,12 +1345,12 @@ void observe_SADAR1_HotPlugEventCallback(const DevType devType,const DevAction d
                         }
                         else
                         {
-                            printf("[ADD]: SaDar1 dev_map没找到 %d\r\n",__LINE__);
+                            printf("[ADD]: msl53l1m dev_map没找到 %d\r\n",__LINE__);
                         }
                     }
                     else
                     {
-                        printf("[ADD]:SaDar1 pos_map没找到 %d\r\n",__LINE__);
+                        printf("[ADD]:msl53l1m pos_map没找到 %d\r\n",__LINE__);
                     }
                       
                 }
@@ -1290,7 +1363,71 @@ void observe_SADAR1_HotPlugEventCallback(const DevType devType,const DevAction d
                         {
                             stop_Thread(iter->second,true);  
                             array_delete_pre(devPath);
-                            printf("测距传感器SaDar1拔出\r\n");
+                            printf("测距传感器msl53l1m拔出\r\n");
+                        }
+                        else
+                        {
+                            printf("[REMOVE]:pos_map没找到 %d\r\n",__LINE__);   
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+/*********************************VL53************************************************/
+void observe_VL53_HotPlugEventCallback(const DevType devType,const DevAction devAction,const char * devPath)
+{
+    int loaction = -1;
+    auto iter_order = dev_order.find("vl53");
+    if(iter_order != dev_order.end())
+    {
+        loaction = iter_order->second;
+    }
+
+    if(strcmp(devPath,dev_name[loaction]) == 0)
+    {
+        int pos = arry_insert_back(devPath);
+        if(pos != -1)
+        {
+            if(devType == DevType_Tty)
+            {
+                if(devAction == DevAction_Add)
+                {
+
+                    system(order_info[loaction]);
+                    auto iter = pos_map.find(dev_name[loaction]);
+                    if(iter != pos_map.end())
+                    {
+                        isstop[iter->second] = false; 
+                        auto iter2 = dev_map.find(dev_name[loaction]);
+                        if(iter2 != dev_map.end())
+                        {
+                            std::thread msl53l1m(iter2->second);
+                            msl53l1m.detach();
+                            printf("测距传感器VL53插入\r\n");
+                        }
+                        else
+                        {
+                            printf("[ADD]: VL53 dev_map没找到 %d\r\n",__LINE__);
+                        }
+                    }
+                    else
+                    {
+                        printf("[ADD]:VL53 pos_map没找到 %d\r\n",__LINE__);
+                    }
+                      
+                }
+                else if(devAction == DevAction_Remove)
+                {
+                    if(strcmp(devPath,dev_name[loaction]) == 0)
+                    {
+                        auto iter = pos_map.find(dev_name[loaction]);
+                        if(iter != pos_map.end())
+                        {
+                            stop_Thread(iter->second,true);  
+                            array_delete_pre(devPath);
+                            printf("测距传感器VL53拔出\r\n");
                         }
                         else
                         {
@@ -4079,7 +4216,7 @@ void cb_video1_test_singal()
         ret = write(fd[loaction],video1_send_buffer,5);
         if (ret == -1)
         {
-            printf("write error\r\n");
+            // printf("write error\r\n");
             continue;
         }          
         
@@ -4116,7 +4253,7 @@ void cb_video1_test_singal()
         ret = write(fd[loaction],video1_send_buffer_hifu,5);
         if (ret == -1)
         {
-            printf("write error\r\n");
+            // printf("write error\r\n");
             continue;
         }   
         
@@ -4283,6 +4420,235 @@ int video1_uart_cfg(const uart_cfg_t *cfg)
     /* 配置OK 退出 */
     return 0;
 }
+/***********************************video2*********************************************/
+
+void cb_video2_test_singal()
+{
+    uart_cfg_t cfg = {0};
+    int loaction = -1;
+    auto iter_order = dev_order.find("video2");
+    if(iter_order != dev_order.end())
+    {
+        loaction = iter_order->second;
+    }
+
+    //串口初始
+    video2_uart_init(dev_name[loaction]);
+    //设置串口参数 
+    video2_uart_cfg(&cfg);
+
+    int ret = 0;
+    bool quit = true;
+    while (Get_isstop(loaction) != true)
+    {
+    
+        ret = write(fd[loaction],video2_send_buffer,5);
+        if (ret == -1)
+        {
+            // printf("write error\r\n");
+            continue;
+        }          
+        
+        // ret = write(fd[loaction],video1_send_buffer_leng,5);
+        // if (ret == -1)
+        // {
+        //     printf("write error\r\n");
+        //     exit(0);
+        // }      
+
+        sleep(1);
+        ret = write(fd[loaction],video2_send_buffer_1,16);
+        if (ret == -1)
+        {
+            // printf("write error\r\n");
+            continue;
+        }      
+
+        memset(video2_buffer_1,0,video2_receive_num);
+        ret = read(fd[loaction],video2_buffer_1,video2_receive_num);
+        if(ret == -1)
+        {
+            printf("read error\r\n");
+            exit(0);
+        }
+        for (int i = 0; i < video2_receive_num; i++)
+        {
+            printf("%#x ",video2_buffer_1[i]);
+        }
+        printf("\r\n");
+
+
+        
+        ret = write(fd[loaction],video2_send_buffer_hifu,5);
+        if (ret == -1)
+        {
+            // printf("write error\r\n");
+            continue;
+        }   
+        
+    }
+    close(fd[loaction]);
+}
+
+int video2_uart_init(const char *device)
+{
+    int loaction = -1;
+    auto iter_order = dev_order.find("video2");
+    if(iter_order != dev_order.end())
+    {
+        loaction = iter_order->second;
+    }
+    
+    /* 打开串口终端  使用的标志有 可读可写，告诉系统该节点不会成为进程的控制终端，非阻塞方式，读不到数据返回-1,*/
+    fd[loaction] = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    if (0 > fd[loaction]) {
+        fprintf(stderr, "open error: %s: %s\n", device, strerror(errno));
+        return -1;
+    }
+
+    /* 获取串口当前的配置参数 */
+    if (0 > tcgetattr(fd[loaction], &video2_old_cfg)) 
+    {
+        fprintf(stderr, "tcgetattr error: %s\n", strerror(errno));
+        close(fd[loaction]);
+        return -1;
+    }
+
+    return 0;
+}
+//串口配置
+int video2_uart_cfg(const uart_cfg_t *cfg)
+{
+    int loaction = -1;
+    auto iter_order = dev_order.find("video2");
+    if(iter_order != dev_order.end())
+    {
+        loaction = iter_order->second;
+    }
+
+    struct termios new_cfg = {0};   //将new_cfg对象清零
+    speed_t speed;
+
+    /* 设置为原始模式 */
+    cfmakeraw(&new_cfg);
+
+    /* 使能接收 */
+    new_cfg.c_cflag |= CREAD;
+
+    /* 设置波特率 */
+    switch (cfg->baudrate) {
+        case 1200: speed = B1200;
+            break;
+        case 1800: speed = B1800;
+            break;
+        case 2400: speed = B2400;
+            break;
+        case 4800: speed = B4800;
+            break;
+        case 9600: speed = B9600;
+            break;
+        case 19200: speed = B19200;
+            break;
+        case 38400: speed = B38400;
+            break;
+        case 57600: speed = B57600;
+            break;
+        case 115200: speed = B115200;
+            break;
+        case 230400: speed = B230400;
+            break;
+        case 460800: speed = B460800;
+            break;
+        case 500000: speed = B500000;
+            break;
+        default:    //默认配置为115200
+            speed = B115200;
+            // printf("default baud rate: 9600\n");
+            break;
+    }
+
+    if (0 > cfsetspeed(&new_cfg, speed)) 
+    {
+        fprintf(stderr, "cfsetspeed error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    /* 设置数据位大小 */
+    new_cfg.c_cflag &= ~CSIZE;  //将数据位相关的比特位清零
+    switch (cfg->dbit) {
+        case 5:
+            new_cfg.c_cflag |= CS5;
+            break;
+        case 6:
+            new_cfg.c_cflag |= CS6;
+            break;
+        case 7:
+            new_cfg.c_cflag |= CS7;
+            break;
+        case 8:
+            new_cfg.c_cflag |= CS8;
+            break;
+        default:    //默认数据位大小为8
+            new_cfg.c_cflag |= CS8;
+            // printf("default data bit size: 8\n");
+            break;
+    }
+
+    /* 设置奇偶校验 */
+    switch (cfg->parity) {
+        case 'N':       //无校验
+            new_cfg.c_cflag &= ~PARENB;
+            new_cfg.c_iflag &= ~INPCK;
+            break;
+        case 'O':       //奇校验
+            new_cfg.c_cflag |= (PARODD | PARENB);
+            new_cfg.c_iflag |= INPCK;
+            break;
+        case 'E':       //偶校验
+            new_cfg.c_cflag |= PARENB;
+            new_cfg.c_cflag &= ~PARODD; /* 清除PARODD标志，配置为偶校验 */
+            new_cfg.c_iflag |= INPCK;
+            break;
+        default:    //默认配置为无校验
+            new_cfg.c_cflag &= ~PARENB;
+            new_cfg.c_iflag &= ~INPCK;
+            // printf("default parity: N\n");
+            break;
+    }
+
+    /* 设置停止位 */
+    switch (cfg->sbit) {
+        case 1:     //1个停止位
+            new_cfg.c_cflag &= ~CSTOPB;
+            break;
+        case 2:     //2个停止位
+            new_cfg.c_cflag |= CSTOPB;
+            break;
+        default:    //默认配置为1个停止位
+            new_cfg.c_cflag &= ~CSTOPB;
+            // printf("default stop bit size: 1\n");
+            break;
+    }
+
+    /* 将MIN和TIME设置为0 */
+    new_cfg.c_cc[VTIME] = 0;
+    new_cfg.c_cc[VMIN] = 0;
+
+    /* 清空缓冲区 */
+    if (0 > tcflush(fd[loaction], TCIOFLUSH)) {
+        fprintf(stderr, "tcflush error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    /* 写入配置、使配置生效 */
+    if (0 > tcsetattr(fd[loaction], TCSANOW, &new_cfg)) {
+        fprintf(stderr, "tcsetattr error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    /* 配置OK 退出 */
+    return 0;
+}
 
 /***********************************测距**************************************************/
 /***********************************msl53l1m**************************************************/
@@ -4299,7 +4665,7 @@ void cb_SaDar1_test_singal()
     }
 
     //串口初始
-    Sadar1_uart_init(dev_name[loaction]);
+    SaDar1_uart_init(dev_name[loaction]);
     //设置串口参数 
     SaDar1_uart_cfg(&cfg);
     int ret = 0;
@@ -4314,7 +4680,7 @@ void cb_SaDar1_test_singal()
     close(fd[loaction]);
 }
 //串口初始化
-int Sadar1_uart_init(const char *device)
+int SaDar1_uart_init(const char *device)
 {
     int loaction = -1;
     auto iter_order = dev_order.find("msl53l1m");
@@ -4345,6 +4711,194 @@ int SaDar1_uart_cfg(const uart_cfg_t *cfg)
 {
     int loaction = -1;
     auto iter_order = dev_order.find("msl53l1m");
+    if(iter_order != dev_order.end())
+    {
+        loaction = iter_order->second;
+    }
+
+    struct termios new_cfg = {0};   //将new_cfg对象清零
+    speed_t speed;
+
+    /* 设置为原始模式 */
+    cfmakeraw(&new_cfg);
+
+    /* 使能接收 */
+    new_cfg.c_cflag |= CREAD;
+
+    /* 设置波特率 */
+    switch (cfg->baudrate) {
+        case 1200: speed = B1200;
+            break;
+        case 1800: speed = B1800;
+            break;
+        case 2400: speed = B2400;
+            break;
+        case 4800: speed = B4800;
+            break;
+        case 9600: speed = B9600;
+            break;
+        case 19200: speed = B19200;
+            break;
+        case 38400: speed = B38400;
+            break;
+        case 57600: speed = B57600;
+            break;
+        case 115200: speed = B115200;
+            break;
+        case 230400: speed = B230400;
+            break;
+        case 460800: speed = B460800;
+            break;
+        case 500000: speed = B500000;
+            break;
+        default:    //默认配置为115200
+            speed = B115200;
+            // printf("default baud rate: 9600\n");
+            break;
+    }
+
+    if (0 > cfsetspeed(&new_cfg, speed)) 
+    {
+        fprintf(stderr, "cfsetspeed error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    /* 设置数据位大小 */
+    new_cfg.c_cflag &= ~CSIZE;  //将数据位相关的比特位清零
+    switch (cfg->dbit) {
+        case 5:
+            new_cfg.c_cflag |= CS5;
+            break;
+        case 6:
+            new_cfg.c_cflag |= CS6;
+            break;
+        case 7:
+            new_cfg.c_cflag |= CS7;
+            break;
+        case 8:
+            new_cfg.c_cflag |= CS8;
+            break;
+        default:    //默认数据位大小为8
+            new_cfg.c_cflag |= CS8;
+            // printf("default data bit size: 8\n");
+            break;
+    }
+
+    /* 设置奇偶校验 */
+    switch (cfg->parity) {
+        case 'N':       //无校验
+            new_cfg.c_cflag &= ~PARENB;
+            new_cfg.c_iflag &= ~INPCK;
+            break;
+        case 'O':       //奇校验
+            new_cfg.c_cflag |= (PARODD | PARENB);
+            new_cfg.c_iflag |= INPCK;
+            break;
+        case 'E':       //偶校验
+            new_cfg.c_cflag |= PARENB;
+            new_cfg.c_cflag &= ~PARODD; /* 清除PARODD标志，配置为偶校验 */
+            new_cfg.c_iflag |= INPCK;
+            break;
+        default:    //默认配置为无校验
+            new_cfg.c_cflag &= ~PARENB;
+            new_cfg.c_iflag &= ~INPCK;
+            // printf("default parity: N\n");
+            break;
+    }
+
+    /* 设置停止位 */
+    switch (cfg->sbit) {
+        case 1:     //1个停止位
+            new_cfg.c_cflag &= ~CSTOPB;
+            break;
+        case 2:     //2个停止位
+            new_cfg.c_cflag |= CSTOPB;
+            break;
+        default:    //默认配置为1个停止位
+            new_cfg.c_cflag &= ~CSTOPB;
+            // printf("default stop bit size: 1\n");
+            break;
+    }
+
+    /* 将MIN和TIME设置为0 */
+    new_cfg.c_cc[VTIME] = 0;
+    new_cfg.c_cc[VMIN] = 0;
+
+    /* 清空缓冲区 */
+    if (0 > tcflush(fd[loaction], TCIOFLUSH)) {
+        fprintf(stderr, "tcflush error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    /* 写入配置、使配置生效 */
+    if (0 > tcsetattr(fd[loaction], TCSANOW, &new_cfg)) {
+        fprintf(stderr, "tcsetattr error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    /* 配置OK 退出 */
+    return 0;
+}
+/***********************************VL53**************************************************/
+void cb_VL53_test_singal()
+{
+
+    uart_cfg_t cfg = {0};
+
+    int loaction = -1;
+    auto iter_order = dev_order.find("vl53");
+    if(iter_order != dev_order.end())
+    {
+        loaction = iter_order->second;
+    }
+
+    //串口初始
+    VL53_uart_init(dev_name[loaction]);
+    //设置串口参数 
+    VL53_uart_cfg(&cfg);
+    int ret = 0;
+    while (Get_isstop(loaction) != true)
+    {
+        ret = read(fd[loaction],VL53_buffer,50);
+        if(ret > 0)
+        {
+            printf("%s",VL53_buffer);
+        }
+    }
+    close(fd[loaction]);
+}
+//串口初始化
+int VL53_uart_init(const char *device)
+{
+    int loaction = -1;
+    auto iter_order = dev_order.find("vl53");
+    if(iter_order != dev_order.end())
+    {
+        loaction = iter_order->second;
+    }
+    
+    /* 打开串口终端  使用的标志有 可读可写，告诉系统该节点不会成为进程的控制终端，非阻塞方式，读不到数据返回-1,*/
+    fd[loaction] = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    if (0 > fd[loaction]) {
+        fprintf(stderr, "open error: %s: %s\n", device, strerror(errno));
+        return -1;
+    }
+
+    /* 获取串口当前的配置参数 */
+    if (0 > tcgetattr(fd[loaction], &video1_old_cfg)) 
+    {
+        fprintf(stderr, "tcgetattr error: %s\n", strerror(errno));
+        close(fd[loaction]);
+        return -1;
+    }
+
+    return 0;
+}
+//串口配置
+int VL53_uart_cfg(const uart_cfg_t *cfg)
+{
+    int loaction = -1;
+    auto iter_order = dev_order.find("vl53");
     if(iter_order != dev_order.end())
     {
         loaction = iter_order->second;
